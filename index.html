@@ -2076,6 +2076,9 @@ function aiAllianceRequest(from,to){if(!ctry(from)||!ctry(to)||from==to||atWar(f
 function resolveAllianceOffer(id,accepted,actor){actor=actor==null?G.pid:Number(actor);const i=G.offers.findIndex(o=>o.type=='alliance'&&String(o.id)==String(id));if(i<0)return false;const o=G.offers[i],to=Number(o.to??G.pid);if(to!==actor)return false;if(!ctry(o.from)||!ctry(to)||atWar(o.from,to)){G.offers.splice(i,1);return false}G.offers.splice(i,1);if(accepted){makeAlly(o.from,to);lg(ctry(to).name+' accepted the alliance proposal from '+ctry(o.from).name,to==G.pid||o.from==G.pid)}else lg(ctry(to).name+' declined the alliance proposal from '+ctry(o.from).name,to==G.pid||o.from==G.pid);return true}
 function requestAllianceUI(from,to){const mp=window.MP;if(mp&&(mp.host||mp.guest)&&typeof mp.requestAlliance=='function')return mp.requestAlliance(to);return aiAllianceRequest(from,to)}
 function answerAllianceUI(o,accepted){if(!o)return false;const mp=window.MP;if(mp&&(mp.host||mp.guest)&&typeof mp.answerAlliance=='function')return mp.answerAlliance(o.id,accepted);return resolveAllianceOffer(o.id,accepted,G.pid)}
+/* ---- prosperity balancing: the better a country does, the more often (and the nastier) bad events hit; the worse it does, the more good luck comes ---- */
+function prosperity(s){const st=((s.stab||0)*.3+(s.loy||0)*.2+(s.mor||0)*.1+(s.food||0)*.15)/.75/100,tr=Math.min(1,Math.max(0,(s.tre||0)/(40+(s.gdp||0)*.6)));return Math.max(0,Math.min(1,.65*st+.35*tr-((s.infl||0)>10?.1:0)))}
+function evtMult(s){return 1+Math.abs(prosperity(s)-.5)*1.6}
 function event(c,s,p){const E=[['Economic crash',()=>{s.gdp*=.86;s.tre*=.78;s.stab-=5;s.infl+=3}],['Famine',()=>{s.food-=28;s.pop*=.985;s.loy-=5}],['Natural disaster',()=>{s.infra-=6;s.pop*=.99;s.loy-=2}],['Pandemic',()=>{s.pop*=.97;s.gdp*=.96;s.mor-=5}],['Political crisis',()=>{s.stab-=9;s.fac.Populists+=9}],['Resource discovery',()=>{s.res+=25;s.gdp*=1.06}],['Technological breakthrough',()=>{const i=R()*11|0;s.tech[i]=cl(s.tech[i]+6)}],['Leadership change',()=>{s.stab+=pick([-8,8]);s.gens++;if(R()<.3)s.gov=pick(GOV)}],['Revolution',()=>{s.stab-=13;s.loy-=8}],['Resource shortage',()=>{s.res-=20;s.ind-=3}],['Diplomatic crisis',()=>{const o=pick(countries);if(o.id!=c.id)addRel(c.id,o.id,-22)}],['Currency crisis',()=>{s.infl+=5;s.tre*=.88}]];
  const E2=[
  ['Bumper harvest',()=>{s.food=cl(s.food+22);s.loy=cl(s.loy+3)}],
@@ -2103,9 +2106,46 @@ function event(c,s,p){const E=[['Economic crash',()=>{s.gdp*=.86;s.tre*=.78;s.st
  ['Foreign investment',()=>{s.tre+=18;s.gdp*=1.03;s.infra=cl(s.infra+2)}],
  ['Bandit raids',()=>{s.loy=cl(s.loy-2);s.tre*=.97;s.infra=cl(s.infra-2)}],
  ['National festival',()=>{s.mor=cl(s.mor+6);s.loy=cl(s.loy+4);s.tre*=.97}]];
- const all=E.concat(E2);s.lastEv=s.lastEv||[];
+ const rr=()=>{const o=pick(countries);return o&&o.id!=c.id?o:null},tk=()=>R()*11|0;
+ const E3=[
+ ['Speculative bubble bursts',()=>{s.gdp*=.9;s.tre*=.85;s.infl+=2},'bad',(s,pr)=>pr>.55],
+ ['Industrial espionage',()=>{const i=tk();s.tech[i]=cl(s.tech[i]-3);const o=rr();if(o)addRel(c.id,o.id,-8)},'bad',(s,pr)=>pr>.5],
+ ['Tax evasion scandal',()=>{s.tre*=.92;s.stab=cl(s.stab-4);s.loy=cl(s.loy-3)},'bad'],
+ ['Luxury backlash',()=>{s.loy=cl(s.loy-6);s.stab=cl(s.stab-4);s.mor=cl(s.mor-2)},'bad',(s,pr)=>pr>.6],
+ ['Capital flight',()=>{s.tre*=.8;s.gdp*=.97},'bad',s=>s.tre>120],
+ ['Supply chain collapse',()=>{s.ind=cl(s.ind-6);s.gdp*=.96;s.infl+=2},'bad'],
+ ['Elite conspiracy',()=>{s.stab=cl(s.stab-8);s.tre*=.93},'bad',(s,pr)=>pr>.55],
+ ['Housing bubble',()=>{s.gdp*=.95;s.loy=cl(s.loy-3)},'bad',(s,pr)=>pr>.5],
+ ['Cyber attack on banks',()=>{s.tre*=.9;s.infl+=1.5;s.stab=cl(s.stab-2)},'bad'],
+ ['Foreign jealousy',()=>{const o=rr();if(o)addRel(c.id,o.id,-15);s.rep=cl(s.rep-2)},'bad',(s,pr)=>pr>.6],
+ ['Labour shortage',()=>{s.gdp*=.97;s.ind=cl(s.ind-3)},'bad',(s,pr)=>pr>.55],
+ ['Overheated economy',()=>{s.infl+=4;s.gdp*=.98},'bad',(s,pr)=>pr>.6],
+ ['Locust swarm',()=>{s.food=cl(s.food-18);s.pop*=.995},'bad'],
+ ['Mine collapse',()=>{s.res=cl(s.res-12);s.ind=cl(s.ind-3);s.loy=cl(s.loy-3)},'bad'],
+ ['Wildfire',()=>{s.infra=cl(s.infra-4);s.food=cl(s.food-8);s.res=cl(s.res-6)},'bad'],
+ ['Merchant fleet lost at sea',()=>{s.tre*=.95;s.gdp*=.99},'bad'],
+ ['Foreign aid arrives',()=>{s.tre+=30;s.loy=cl(s.loy+3);s.rep=cl(s.rep+2)},'good',(s,pr)=>pr<.5],
+ ['Charity from neighbours',()=>{s.food=cl(s.food+20);s.loy=cl(s.loy+3)},'good',(s,pr)=>pr<.45],
+ ['Lucky mineral find',()=>{s.res=cl(s.res+15);s.gdp*=1.03;s.tre+=10},'good'],
+ ['Public solidarity wave',()=>{s.loy=cl(s.loy+8);s.stab=cl(s.stab+5);s.mor=cl(s.mor+4)},'good',(s,pr)=>pr<.5],
+ ['Debt relief',()=>{s.tre+=25;s.infl=Math.max(0,s.infl-2)},'good',s=>s.tre<30||s.infl>8],
+ ['Tax windfall',()=>{s.tre+=15+s.gdp*.05},'good'],
+ ['Emergency harvest',()=>{s.food=cl(s.food+25)},'good',s=>s.food<40],
+ ['Reform movement',()=>{s.stab=cl(s.stab+5);s.loy=cl(s.loy+3);s.gdp*=1.01},'good'],
+ ['Technology transfer',()=>{const i=tk();s.tech[i]=cl(s.tech[i]+5)},'good'],
+ ['National hero',()=>{s.mor=cl(s.mor+8);s.loy=cl(s.loy+4)},'good'],
+ ['Peaceful year',()=>{s.stab=cl(s.stab+4);s.loy=cl(s.loy+2)},'good',(s,pr)=>pr<.5],
+ ['Tourism boom',()=>{s.gdp*=1.04;s.tre+=10},'good'],
+ ['Skilled migrants arrive',()=>{s.pop*=1.01;s.gdp*=1.02;s.food=cl(s.food-3)},'good'],
+ ['Oil strike',()=>{s.tre+=30;s.res=cl(s.res+12);s.infl+=1},'good']];
+ const BADN=new Set(['Economic crash','Famine','Natural disaster','Pandemic','Political crisis','Revolution','Resource shortage','Diplomatic crisis','Currency crisis','Earthquake','Great flood','Drought','Plague outbreak','Factory disaster','Corruption scandal','General strike','Banking panic','Student protests','Coup attempt foiled','Bandit raids']),
+  GOODN=new Set(['Resource discovery','Technological breakthrough','Bumper harvest','Gold rush','Trade boom','Cultural golden age','Scientific society founded','Royal wedding','Military reforms','Religious revival','Grand infrastructure project','Energy discovery','Foreign investment','National festival']);
+ const pr=prosperity(s),wb=pr>.5?1+(pr-.5)*1.2:Math.max(.7,1-(.5-pr)*.6),wg=pr<.5?1+(.5-pr)*1.2:Math.max(.7,1-(pr-.5)*.6);
+ const kind=x=>x[2]||(BADN.has(x[0])?'bad':GOODN.has(x[0])?'good':'neu');
+ const all=E.concat(E2,E3).filter(x=>!x[3]||x[3](s,pr));s.lastEv=s.lastEv||[];
  let pool=all.filter(x=>!s.lastEv.includes(x[0]));if(!pool.length)pool=all;
- const e=pick(pool);e[1]();s.lastEv.push(e[0]);if(s.lastEv.length>8)s.lastEv.shift();
+ const wt=pool.map(x=>{const k=kind(x);return k=='bad'?wb:k=='good'?wg:1});let tot=0;for(const w of wt)tot+=w;let roll=R()*tot,e=pool[pool.length-1];for(let i=0;i<pool.length;i++){roll-=wt[i];if(roll<=0){e=pool[i];break}}
+ e[1]();if(kind(e)=='bad'&&pr>.62&&s.tre>100)s.tre*=.96;s.lastEv.push(e[0]);if(s.lastEv.length>10)s.lastEv.shift();
  for(const k of ['food','res','infra','ind','stab','mor','loy','xp','rep'])if(typeof s[k]=='number')s[k]=cl(s[k]);
  lg(e[0]+' in '+c.name,p)}
 function rebel(c,s){const a=pick(arms(c.id));if(!a)return;const n=armyStrength(a),nc=addCountry(c.name+' Rebels',rc(),c.flag),h=Math.max(1,n/2|0);a.n=String(n-h);const b={...a,gen:null,id:uid++,cid:nc.id,n:String(h),x:a.x+25,y:a.y+15,weapon:currentEraWeapon(),weaponAnimAt:0,weaponAnimKind:'',moveTarget:null};items.push(b);G.ST[nc.id]=JSON.parse(JSON.stringify(s));Object.assign(G.ST[nc.id],{pop:s.pop*.1,loy:50,stab:40,gov:'Junta'});s.pop*=.9;s.loy+=10;declareWar(nc.id,c.id);lg(''+c.name+' regions rebel — new faction: '+nc.name,c.id==G.pid);buildCl();buildAllies()}
@@ -2119,7 +2159,7 @@ function tick(){if(window.MPG)return;if(!window.MPH&&(!G.on||G.dec||worldPaused|
   CATS.forEach((_,i)=>{s.tech[i]=cl(s.tech[i]+OPT.tech*(.15+R()*.45)*(s.gdp/150+.3)*(s.prop/40+1));for(const o of countries)if(ally(c.id,o.id)||G.trade.has(rk(c.id,o.id))){const t=G.ST[o.id];if(t&&t.tech[i]>s.tech[i])s.tech[i]+=.08}});
   const mg=milGrowth(c,s),cap=s.pop*.06*(OPT.army||1)*mg.capMul;if(n<cap&&s.tre>5&&(!isP)&&A.length&&(G.year%2===0||mg.fast)&&R()<mg.prob){const a=pick(A),v=armyStrength(a),g=Math.max(1,v*(.004+s.ind/10000)*(1+s.bd.b*.1)*mg.rate),add=Math.min(cap-n,g);a.n=String(Math.round(v+add));s.tre-=add/1.2e5}else if(!isP&&A.length&&n>cap*1.15&&mg.score<-.3&&R()<.5){const a=pick(A),v=armyStrength(a);a.n=String(Math.max(1,Math.round(v*(1-.012*(-mg.score)))))}
   if(!A.length&&!isP&&terrOf(c)<30){s.noArmyYears=(s.noArmyYears||0)+1;if(s.noArmyYears>=6&&R()<.35)collapse(c);continue}else s.noArmyYears=0
-  if(R()<.035*OPT.evt)event(c,s,isP);if(s.loy<22&&G.year>=(s.rebellionCooldown||0)&&R()<.014*OPT.reb*((s.rebellionRiskUntil||0)>G.year?1.5:1)&&A.length>0)rebel(c,s);s.rb=s.loy<30?1:0;
+  if(R()<.035*OPT.evt*evtMult(s))event(c,s,isP);if(s.loy<22&&G.year>=(s.rebellionCooldown||0)&&R()<.014*OPT.reb*((s.rebellionRiskUntil||0)>G.year?1.5:1)&&A.length>0)rebel(c,s);s.rb=s.loy<30?1:0;
   if(s.stab<15&&R()<.2){s.gov=pick(GOV);s.stab=45;lg('Coup/leadership change in '+c.name,isP)}
   if(!isP)ai(c,s,war,A)}
  for(const k of [...G.wars]){const[a,b]=k.split('-').map(Number);if(!ctry(a)||!ctry(b)){G.wars.delete(k);continue}if((G.ST[a].exh>40||G.ST[b].exh>40)&&R()<.4&&!humanCountry(a)&&!humanCountry(b))peace(a,b)}
@@ -2214,7 +2254,7 @@ function eff(s,i){[()=>s.xp=cl(s.xp+10),()=>s.food=cl(s.food+15),()=>s.ind=cl(s.
 function research(c,s,isP){if(!s.lv){s.lv=CATS.map(()=>0);s.pj=null;s.pg=0}
  if(s.pj==null&&!isP){const o=CATS.map((_,i)=>i).filter(i=>s.lv[i]<3&&s.tech[i]>=NEED[i]);if(o.length)s.pj=pick(o)}
  if(s.pj!=null){s.pg+=s.gdp*.03+s.bd.l*2+1;const i=s.pj;if(s.pg>=pjCost(s,i)){s.pg=0;s.lv[i]++;s.tech[i]=cl(s.tech[i]+8);eff(s,i);s.pj=null;lg(''+c.name+' completed '+PJ[i][1][s.lv[i]-1]+' ('+PJ[i][0]+')',isP)}}}
-function decide(){const s=G.ST[G.pid];if(!s||G.dec||G.mpOver||R()>.07)return;const O=countries.filter(o=>o.id!=G.pid&&!atWar(G.pid,o.id)),o=O.length?pick(O):null;
+function decide(){const s=G.ST[G.pid];if(!s||G.dec||G.mpOver||R()>.07*evtMult(s))return;const O=countries.filter(o=>o.id!=G.pid&&!atWar(G.pid,o.id)),o=O.length?pick(O):null;
  const D=[['Food shortage','Granaries are low and prices are rising.',[['Import grain (−30 treasury)',()=>{s.tre-=30;s.food=cl(s.food+25)}],['Ration food (−8 loyalty)',()=>{s.loy=cl(s.loy-8);s.stab=cl(s.stab-3)}],['Do nothing',()=>{s.food=cl(s.food-10);s.pop*=.98}]]],
  ['Strike wave','Workers demand better pay.',[['Concede (−20 treasury, +8 loyalty)',()=>{s.tre-=20;s.loy=cl(s.loy+8)}],['Crack down (−10 loyalty, +5 stability)',()=>{s.loy=cl(s.loy-10);s.stab=cl(s.stab+5)}],['Negotiate (gamble)',()=>{if(R()<.5)s.loy=cl(s.loy+3);else{s.loy=cl(s.loy-6);s.stab=cl(s.stab-4)}}]]],
  ['Merchant petition','Merchants want lower tariffs.',[['Grant (+4% GDP, −10 treasury)',()=>{s.gdp*=1.04;s.tre-=10}],['Refuse (merchants angry)',()=>{s.fac.Merchants=cl(s.fac.Merchants+15);s.stab=cl(s.stab-2)}]]],
@@ -2244,6 +2284,13 @@ function decide(){const s=G.ST[G.pid];if(!s||G.dec||G.mpOver||R()>.07)return;con
  ['Veterans demand pensions','Wounded soldiers are petitioning the court.',[['Grant pensions (−20 treasury, +morale)',()=>{s.tre-=20;s.mor=cl(s.mor+7)}],['Give land grants',()=>{s.loy=cl(s.loy+3);s.food=cl(s.food-3)}],['Refuse',()=>{s.mor=cl(s.mor-6);s.loy=cl(s.loy-3)}]]],
  ['War weariness','The public tires of the long war.',[['Hold a victory parade (−10 treasury, +morale)',()=>{s.tre-=10;s.mor=cl(s.mor+6);s.ww=Math.max(0,(s.ww||0)-8)}],['Publish casualty lists (honesty)',()=>{s.loy=cl(s.loy-3);s.rep=cl(s.rep+3)}],['Press on',()=>{s.ww=(s.ww||0)+6}]]]);
  if(s.tre>120)D.push(['Wealthy donors','Rich patrons offer to fund a national project.',[['Build a university (+tech)',()=>{s.tech=s.tech.map(t=>cl(t+2));s.tre-=20}],['Build a harbour (+GDP)',()=>{s.gdp*=1.03;s.tre-=20}],['Refuse their strings',()=>{s.rep=cl(s.rep+2)}]]]);
+ const prd=prosperity(s);
+ if(prd>.6)D.push(
+ ['Speculators arrive','Investors flood in, and prices are soaring.',[['Tax the boom (+25 treasury, −3 loyalty)',()=>{s.tre+=25;s.loy=cl(s.loy-3)}],['Cool the market (−15 treasury, +stability)',()=>{s.tre-=15;s.stab=cl(s.stab+4);s.infl=Math.max(0,s.infl-1.5)}],['Ride the bubble (gamble)',()=>{if(R()<.5){s.gdp*=1.06;s.tre+=30}else{s.gdp*=.92;s.tre*=.85;s.infl+=3}}]]],
+ ['Elite demands privileges','Wealthy families want tax breaks and titles.',[['Grant them (−treasury income, +stability)',()=>{s.tre-=20;s.stab=cl(s.stab+4);s.loy=cl(s.loy-3)}],['Refuse (they scheme)',()=>{s.stab=cl(s.stab-5);s.fac.Merchants=cl((Number(s.fac.Merchants)||0)+8)}],['Tax their fortunes (+30 treasury, −6 stability)',()=>{s.tre+=30;s.stab=cl(s.stab-6)}]]]);
+ if(prd<.42)D.push(
+ ['Bailout offer','Foreign bankers will bail you out, for a price.',[['Accept (+50 treasury, −5 reputation)',()=>{s.tre+=50;s.rep=cl(s.rep-5)}],['Sell state assets (+35 treasury, −GDP)',()=>{s.tre+=35;s.gdp*=.97}],['Refuse and tighten belts',()=>{s.loy=cl(s.loy-3);s.stab=cl(s.stab+2);s.infl=Math.max(0,s.infl-1)}]]],
+ ['Rally of the people','Citizens volunteer to help rebuild.',[['Organise relief (+loyalty, +stability)',()=>{s.loy=cl(s.loy+7);s.stab=cl(s.stab+5)}],['Channel it into work (+food, +infrastructure)',()=>{s.food=cl(s.food+12);s.infra=cl(s.infra+3)}],['Ignore them',()=>{}]]]);
  G.lastDec=G.lastDec||[];let pool=D.filter(x=>!G.lastDec.includes(x[0]));if(!pool.length)pool=D;
  G.dec=pick(pool);G.lastDec.push(G.dec[0]);if(G.lastDec.length>6)G.lastDec.shift();setWorldPaused(true);panel('dec')}
 {const _pk=window.pick;window.pick=function(p){for(let i=items.length-1;i>=0;i--){const t=items[i];if(!G.on)return _pk(p);if(t.type=='a'&&t.cid==G.pid){const m=FSB*flagMul(t);if(Math.abs(p.x-t.x)<(t.weapon?58:40)*m+6&&p.y>t.y-54*m-6&&p.y<t.y+48*m+6)return t}}return null};const _st=setTool;setTool=function(t){if(G.on&&t!='select'&&t!='pan')return;return _st(t)};
@@ -2258,7 +2305,7 @@ G.mayTake=(c,o)=>{if(!atWar(c.id,o.id))return false;const a=G.ca;if(!a)return tr
 for(const ev of['pointerdown','mousedown','contextmenu'])window.addEventListener(ev,e=>{if(!G.on)return;if(ev=='pointerdown'&&e.button===0&&!e.target.closest('#wheel'))wh.hidden=true;if(e.button===2||ev=='contextmenu'){e.stopImmediatePropagation();e.preventDefault();if(ev=='contextmenu'){if(!(window.claimRC&&window.claimRC(e)))wheelOpen(e)}}},true);
 window.addEventListener('keydown',e=>{if(e.key=='Escape')wh.hidden=true},true);
 const wh=document.createElement('div');wh.id='wheel';wh.hidden=true;document.body.appendChild(wh);
-{const st=document.createElement('style');st.textContent='#wheel{position:fixed;z-index:60;width:210px;height:210px;margin:-105px 0 0 -105px;border-radius:50%;background:var(--pn);border:1px solid var(--bd);color:var(--tx);text-align:center}#wheel[hidden]{display:none}#wheel .wc{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font:600 11px var(--ff);width:64px;color:var(--tx)}#wheel button{position:absolute;width:80px;padding:6px 2px;font-size:12px;background:var(--bt);color:var(--tx);border:1px solid var(--bd);border-radius:2px}#wheel button:hover{background:var(--ac);color:var(--ax)}#wheel .w0{left:65px;top:4px}#wheel .w1{right:4px;top:82px}#wheel .w2{left:65px;bottom:4px}#wheel .w3{left:4px;top:82px}';document.head.appendChild(st)}
+{const st=document.createElement('style');st.textContent='#wheel{position:fixed;z-index:60;width:210px;height:210px;margin:-105px 0 0 -105px;border-radius:50%;background:var(--pn);border:1px solid var(--bd);color:var(--tx);text-align:center}#wheel[hidden]{display:none}#wheel .wc{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font:600 11px var(--ff);width:64px;color:var(--tx)}#wheel button{position:absolute;width:80px;padding:6px 2px;font-size:12px;background:var(--bt);color:var(--tx);border:1px solid var(--bd);border-radius:2px}#wheel button:hover{background:var(--ac);color:var(--ax)}#wheel .w0{left:65px;top:4px}#wheel .w1{right:4px;top:82px}#wheel .w2{left:65px;bottom:4px}#wheel .w3{left:4px;top:82px}#wheel .w4{left:65px;bottom:-34px;background:var(--ac);color:var(--ax);font-weight:700}';document.head.appendChild(st)}
 function wheelOpen(e){if(e.target!==cv)return;const r=cv.getBoundingClientRect(),c=countryAt({x:cam.x+(e.clientX-r.left)/cam.z,y:cam.y+(e.clientY-r.top)/cam.z});if(!c||c.id==G.pid){wh.hidden=true;return}
  const o=c.id,t=G.ST[o],s=G.ST[G.pid],nm=c.name;wh.style.left=Math.max(110,Math.min(innerWidth-110,e.clientX))+'px';wh.style.top=Math.max(110,Math.min(innerHeight-110,e.clientY))+'px';
  wh.innerHTML='<div class="wc">'+esc(nm)+'</div><button class="w0">Peace</button><button class="w1">War</button><button class="w2">Give troops</button><button class="w3">Send spy</button>';wh.hidden=false;
@@ -2266,7 +2313,13 @@ function wheelOpen(e){if(e.target!==cv)return;const r=cv.getBoundingClientRect()
  B(0).onclick=()=>{if(!atWar(G.pid,o))toast('You are not at war with '+nm);else requestPeaceUI(G.pid,o);done()};
  B(1).onclick=()=>{if(atWar(G.pid,o))toast('Already at war with '+nm);else{declareWar(G.pid,o,1,'conquest');s.rep-=3}done()};
  B(2).onclick=()=>{if(atWar(G.pid,o)){toast('You cannot give troops to a nation you are at war with');return done()}const mine=arms(G.pid).sort((a,b)=>armyStrength(b)-armyStrength(a))[0],th=arms(o)[0];if(!mine||!th||armyStrength(mine)<200){toast('No army to spare');return done()}const g=Math.round(armyStrength(mine)*.1);mine.n=String(armyStrength(mine)-g);th.n=String(armyStrength(th)+g);addRel(G.pid,o,15);s.rep=cl(s.rep+2);lg('You gave '+fm(g)+' troops to '+nm,1);done()};
- B(3).onclick=()=>{if(R()<.6)lg(''+nm+': army '+fm(str(o))+', GDP '+t.gdp.toFixed(0)+', tech '+avg(t.tech).toFixed(0)+', '+t.gov+', stab '+t.stab.toFixed(0),1);else{lg('Spy caught in '+nm,1);addRel(G.pid,o,-15)}done()}}
+ B(3).onclick=()=>{if(R()<.6)lg(''+nm+': army '+fm(str(o))+', GDP '+t.gdp.toFixed(0)+', tech '+avg(t.tech).toFixed(0)+', '+t.gov+', stab '+t.stab.toFixed(0),1);else{lg('Spy caught in '+nm,1);addRel(G.pid,o,-15)}done()};
+ if(atWar(G.pid,o)){const myS=str(G.pid),need=Math.max(1,Math.ceil(myS*.01)),ok=str(o)<=need,b=document.createElement('button');b.className='w4';b.textContent='Dissolve';b.style.opacity=ok?'1':'.5';b.title=ok?'Absorb '+nm+' completely. Costs 1% of your soldiers. No rebellions.':'Needs '+nm+' to have 1% or less of your army ('+fm(need)+' soldiers). They have '+fm(str(o))+'.';wh.appendChild(b);b.onclick=()=>{if(!ok){toast('Dissolve needs '+nm+' at 1% of your army or less ('+fm(str(o))+' vs '+fm(need)+')');return}pewDissolve(o);done()}}}
+function pewDissolve(o){const c=ctry(o),s=G.ST[G.pid];if(!c||!s||!atWar(G.pid,o)||G.dead[o])return;const mine=arms(G.pid),total=mine.reduce((v,a)=>v+armyStrength(a),0),cost=Math.ceil(total*.01);if(str(o)>Math.max(1,cost))return toast('Dissolve needs the target at 1% of your army or less');
+ let left=cost;mine.slice().sort((a,b)=>armyStrength(b)-armyStrength(a)).forEach((a,i,arr)=>{const take=i==arr.length-1?left:Math.min(left,Math.ceil(cost*armyStrength(a)/Math.max(1,total)));a.n=String(Math.max(0,armyStrength(a)-take));left-=Math.min(left,take)});
+ for(const k of Object.keys(G.occ)){const q=G.occ[k];if(!q||q.to!=G.pid)continue;const x=((+k%100)+.5)*(W/100),y=(Math.floor(+k/100)+.5)*(H/62);if(countryAt({x,y})==c)delete G.occ[k]}
+ const nm=c.name;annex(G.pid,o);s.loy=cl(s.loy+3);s.stab=cl(s.stab+2);lg('You dissolved '+nm+' for '+fm(cost)+' soldiers (1% of your army). All their land joined you peacefully.',1)}
+
 G.cap={};G.capCd={};G.fallenBy={};G.ol={};G.bdD=0;
 function ownsNear(c,p){for(const[dx,dy]of[[0,0],[9,0],[-9,0],[0,9],[0,-9]])if(countryAt({x:p.x+dx,y:p.y+dy})==c)return true;return false}
 function capOf(c){const k=G.cap[c.id];if(k&&ownsNear(c,k))return k;if(c.capital&&ownsNear(c,c.capital))return G.cap[c.id]={x:c.capital.x,y:c.capital.y,held:0};const cs=cellsOf(c);if(!cs.length)return k||null;let mx=0,my=0;cs.forEach(q=>{mx+=q.x;my+=q.y});mx/=cs.length;my/=cs.length;let b=cs[0],bd=1e18;cs.forEach(q=>{const d=(q.x-mx)**2+(q.y-my)**2;if(d<bd){bd=d;b=q}});return G.cap[c.id]={x:b.x,y:b.y,held:0}}
@@ -2330,7 +2383,7 @@ function sanc(){for(const k of[...G.sanc]){const[a,b]=k.split('>').map(Number),A
 
 /* ===== v4: advisors panel (left) ===== */
 {const st=document.createElement('style');st.textContent='#adv{position:fixed;left:10px;top:var(--ptop,100px);z-index:24;width:268px;max-height:72vh;overflow:auto;background:var(--pn);color:var(--tx);border:1px solid var(--bd);border-radius:3px;padding:8px;font-size:12px;display:none}body.sv #adv{display:block}#adv h4{margin:0 0 2px;display:flex;align-items:center}#adv h4 button{margin-left:auto;padding:0 6px}#adv .ad{border-top:1px solid var(--bd);padding:5px 0}#adv.min .ad{display:none}#adv button{padding:2px 7px;background:var(--bt);color:var(--tx);border:1px solid var(--bd);border-radius:2px;margin:3px 3px 0 0;font-size:11px}#adv button:hover{background:var(--hv)}#adv .u{color:var(--rd)}#adv .crisis{padding:7px;margin:4px 0 7px;border:1px solid var(--bd);border-left:4px solid #c58a24;background:rgba(197,138,36,.13);line-height:1.4}#adv .crisis.warn{border-left-color:#d28b16;background:rgba(210,139,22,.16)}#adv .crisis.danger{border-left-color:#d33;background:rgba(210,35,35,.17)}#adv .crisis b{display:block;margin-bottom:3px}';document.head.appendChild(st);const d=document.createElement('div');d.id='adv';document.body.appendChild(d)}
-function advise(){const box=Q('#adv'),P=G.ST[G.pid],pc=ctry(G.pid);if(!box)return;if(!G.on||!P||!pc){box.innerHTML='';return}
+function advise(){const box=Q('#adv'),P=G.ST[G.pid],pc=ctry(G.pid);if(!box)return;if(window.__pewDragging==box)return;if(!G.on||!P||!pc){box.innerHTML='';return}
  const A=[],add=(p,who,txt,...b)=>A.push({p,who,txt,b}),mine=arms(G.pid),ms=str(G.pid),me=String(G.pid),
  spend=(n,f)=>()=>{if(P.tre<n)return toast('Treasury too low');P.tre-=n;f();buildBar();advise()},
  jump=(x,y)=>()=>{cam.x=x-cv.clientWidth/2/cam.z;cam.y=y-cv.clientHeight/2/cam.z;ZT=null},
@@ -2380,10 +2433,19 @@ function advise(){const box=Q('#adv'),P=G.ST[G.pid],pc=ctry(G.pid);if(!box)retur
  const pendingOffers=(G.offers||[]).filter(o=>Number(o.to??G.pid)===Number(G.pid)).length;
  const notifHtml='<div class="ad"><b>Notifications</b>'+(pendingOffers?' <span class="u">('+pendingOffers+' pending offer'+(pendingOffers>1?'s':'')+')</span>':'')+(recent.length?'<div style="margin-top:3px">'+recent.map(t=>'<div class="hint" style="padding:1px 0">• '+esc(t)+'</div>').join('')+'</div>':'<div class="hint">No recent events.</div>')+'<button data-nb="1">Open Alerts</button></div>';
  const quick=[recruit,fort,roads,loyp,prop,['Import grain (−30)',spend(30,()=>P.food=cl(P.food+25))],['Build infrastructure (−30)',spend(30,()=>P.infra=cl(P.infra+6))],['Institute (−45)',spend(45,()=>P.bd.l++)],['Barracks (−30)',spend(30,()=>P.bd.b++)],['Lower tax to '+Math.max(5,P.tax-5)+'%',()=>{P.tax=Math.max(5,P.tax-5);buildBar();advise()}],['Emergency reconciliation (−25)',()=>{if(G.year<(P.reliefYear||0))return toast('Reconciliation available in '+(P.reliefYear-G.year)+' year(s)');if(P.tre<25)return toast('Treasury too low for reconciliation');P.tre-=25;P.stab=cl(P.stab+15);P.loy=cl(P.loy+12);P.mor=cl(P.mor+10);P.food=cl(P.food+5);P.infl=cl(P.infl-1,0,60);P.reliefYear=G.year+2;G.crisisYears=0;buildBar();advise()}]];
- const quickHtml='<div class="ad"><b>Quick actions</b><br>'+quick.map((x,k)=>'<button data-q="'+k+'">'+esc(x[0])+'</button>').join('')+'</div>';
- box.innerHTML='<h4>Advisors<button id="advt">'+(box.classList.contains('min')?'Show':'Hide')+'</button></h4>'+alertHtml+statusHtml+notifHtml+top.map((a,i)=>'<div class="ad"><b'+(a.p>=8?' class="u"':'')+'>'+a.who+'</b> '+esc(a.txt)+'<br>'+a.b.map((x,j)=>'<button data-i="'+i+'" data-j="'+j+'">'+esc(x[0])+'</button>').join('')+'</div>').join('')+quickHtml;
+ const recIdx=quick.length-1,
+ evHints=[[/famine|harvest|hunger|shortage/i,'Import grain or build infrastructure before food hits zero.',10],[/crash|currency|inflation|recession|depression/i,'Lower taxes a little and avoid new wars while the treasury recovers.',9],[/pandemic|plague|disease/i,'Keep loyalty up with the Loyalty program and avoid conscription.',9],[/revolt|rebel|uprising|revolution|riot/i,'Use Emergency reconciliation, then Propaganda or Loyalty program.',10],[/disaster|earthquake|flood|storm/i,'Build infrastructure and keep a cash reserve.',8],[/war|invad|mobili/i,'Fortify, recruit, and ask allies to join or seek peace.',8],[/coup|crisis|scandal|political/i,'Propaganda campaign and Emergency reconciliation steady the public.',8]],
+ decHtml=G.dec?'<div class="crisis warn"><b>Decision: '+esc(G.dec[0])+'</b><div>'+esc(G.dec[1])+'</div>'+G.dec[2].map((c,i)=>'<button data-ev="'+i+'">'+esc(c[0])+'</button>').join('')+'</div>':'',
+ evLast=(G.major||[]).slice(-3).reverse().map(t=>{const h=evHints.find(x=>x[0].test(t));return h?{t,h:h[1]}:null}).filter(Boolean)[0],
+ evHtml=evLast?'<div class="crisis"><b>Event advice</b><div class="hint">'+esc(evLast.t)+'</div><div style="margin-top:3px">'+esc(evLast.h)+'</div></div>':'',
+ recBar='<div class="advbar"><button data-rec="1" class="advrec" title="Emergency reconciliation: +15 stability, +12 loyalty (cost 25, every 2 years)">Reconciliation'+(G.year<(P.reliefYear||0)?' ('+(P.reliefYear-G.year)+'y)':'')+'</button><button data-pq="prop">Propaganda</button><button data-pq="loy">Loyalty</button></div>';
+const quickHtml='<div class="ad"><b>Quick actions</b><br>'+quick.map((x,k)=>'<button data-q="'+k+'">'+esc(x[0])+'</button>').join('')+'</div>';
+ box.innerHTML='<h4>Advisors<button id="advt">'+(box.classList.contains('min')?'Show':'Hide')+'</button></h4>'+recBar+decHtml+evHtml+alertHtml+statusHtml+notifHtml+top.map((a,i)=>'<div class="ad"><b'+(a.p>=8?' class="u"':'')+'>'+a.who+'</b> '+esc(a.txt)+'<br>'+a.b.map((x,j)=>'<button data-i="'+i+'" data-j="'+j+'">'+esc(x[0])+'</button>').join('')+'</div>').join('')+quickHtml;
  box.querySelectorAll('button[data-i]').forEach(b=>b.onclick=()=>top[+b.dataset.i].b[+b.dataset.j][1]());
  box.querySelectorAll('button[data-q]').forEach(b=>b.onclick=()=>quick[+b.dataset.q][1]());
+ box.querySelectorAll('button[data-rec]').forEach(b=>b.onclick=()=>quick[recIdx][1]());
+ box.querySelectorAll('button[data-pq]').forEach(b=>b.onclick=()=>(b.dataset.pq=='prop'?prop:loyp)[1]());
+ box.querySelectorAll('button[data-ev]').forEach(b=>b.onclick=()=>{const d=G.dec;if(!d)return;d[2][+b.dataset.ev][1]();G.dec=null;Q('#svp').hidden=1;setWorldPaused(false);buildBar();advise()});
  box.querySelectorAll('button[data-nb]').forEach(b=>b.onclick=()=>{const a=Q('#belb');if(a)a.click()});
  Q('#advt').onclick=()=>{box.classList.toggle('min');advise()}}
 {const _ov=over;over=function(){_ov.apply(this,arguments);advise()}}
@@ -3809,7 +3871,36 @@ const build=()=>{const P=q('#svp'),s=G.ST[G.pid];if(!s||P.hidden||panel.cur!='co
   if(G.year<(s.inc[k]||0))return toast('Not ready yet');const why=a.can?a.can(s):'';if(why)return toast(why);
   const g=a.g(s);a.run(s,g);s.inc[k]=G.year+a.cd;coin();
   const t=a.n+(g>0?': +'+g+' treasury':g<0?': invested '+(-g):'');toast(t);lg(t,0);buildBar();rf()}};
-{const _p=panel;panel=function(k){const r=_p.apply(this,arguments);if(k=='country'){try{build()}catch(e){}}return r}}
+const TIERS=[[0,'Tier 1'],[120,'Tier 2'],[250,'Tier 3'],[450,'Tier 4'],[800,'Tier 5']];
+const SHOP=[
+ {k:'grain',t:0,n:'Grain reserve',c:30,cd:4,d:'+20 food and a little loyalty.',run(s){s.food=cl(s.food+20);s.loy=cl(s.loy+1)}},
+ {k:'school',t:1,n:'Public schools',c:60,cd:6,d:'+2 to every technology.',run(s){s.tech=s.tech.map(v=>cl(v+2))}},
+ {k:'customs',t:1,n:'Customs office',c:50,cd:8,d:'+7 treasury a year for 8 years.',run(s){streams(s).push({n:'Customs office',left:8,amt:7})}},
+ {k:'granary',t:1,n:'Relief hospitals',c:55,cd:6,d:'+6 morale, +3 loyalty.',run(s){s.mor=cl(s.mor+6);s.loy=cl(s.loy+3)}},
+ {k:'bank',t:2,n:'Central bank',c:120,cd:10,d:'Inflation −3, stability +3, one-time.',run(s){s.infl=Math.max(0,s.infl-3);s.stab=cl(s.stab+3)}},
+ {k:'rail',t:2,n:'National railway',c:150,cd:8,d:'Infrastructure +8, industry +4, and +10 a year for 8 years.',run(s){s.infra=cl(s.infra+8);s.ind=cl(s.ind+4);streams(s).push({n:'Railway',left:8,amt:10})}},
+ {k:'academy',t:2,n:'Royal academy',c:140,cd:8,d:'+4 to every technology.',run(s){s.tech=s.tech.map(v=>cl(v+4))}},
+ {k:'granaries',t:2,n:'Strategic stockpiles',c:100,cd:6,d:'+25 food and +15 resources.',run(s){s.food=cl(s.food+25);s.res=cl(s.res+15)}},
+ {k:'exchange',t:3,n:'Stock exchange',c:250,cd:10,d:'+30 a year for 6 years. Riskier when the economy overheats.',run(s){streams(s).push({n:'Stock exchange',left:6,amt:30});s.infl+=1}},
+ {k:'wonder',t:3,n:'Grand monument',c:300,cd:12,d:'Loyalty +10, stability +8, reputation +8, propaganda +10.',run(s){s.loy=cl(s.loy+10);s.stab=cl(s.stab+8);s.rep=cl(s.rep+8);s.prop=cl((s.prop||0)+10)}},
+ {k:'spy',t:3,n:'Intelligence agency',c:200,cd:10,d:'Counter-intelligence +1 level.',run(s){s.ci=(s.ci||0)+1}},
+ {k:'factory',t:3,n:'Industrial district',c:300,cd:10,d:'Industry +10 and GDP +4%.',run(s){s.ind=cl(s.ind+10);s.gdp*=1.04}},
+ {k:'fund',t:4,n:'Sovereign wealth fund',c:500,cd:15,d:'+60 a year for 10 years, stability +5.',run(s){streams(s).push({n:'Wealth fund',left:10,amt:60});s.stab=cl(s.stab+5)}},
+ {k:'hub',t:4,n:'Global trade hub',c:450,cd:12,d:'GDP +8%, reputation +5.',run(s){s.gdp*=1.08;s.rep=cl(s.rep+5)}},
+ {k:'guard',t:4,n:'Elite guard corps',c:350,cd:12,d:'Army experience +10 and morale +8.',run(s){s.xp=cl(s.xp+10);s.mor=cl(s.mor+8)}}];
+const buildShop=()=>{const P=q('#svp'),s=G.ST[G.pid];if(!s||P.hidden||panel.cur!='country')return;
+ qa('#wealthShop',P).forEach(e=>e.remove());s.shop=s.shop||{};
+ const tier=TIERS.reduce((a,t,i)=>s.gdp>=t[0]?i:a,0),next=TIERS[tier+1];
+ const w=document.createElement('div');w.id='wealthShop';w.dataset.grp='economy';
+ w.style.cssText='margin:7px 0;padding:8px;border:1px solid var(--bd);border-radius:2px;background:color-mix(in srgb,var(--ac) 7%,var(--pn))';
+ const rows=SHOP.filter(x=>x.t<=tier).map(x=>{const left=(s.shop[x.k]||0)-G.year,why=left>0?'Available again in '+left+' year(s)':s.tre<x.c?'Needs '+x.c+' treasury':'';
+  return'<button type="button" data-shop="'+x.k+'" title="'+he(x.d+(why?' — '+why:''))+'" '+(why?'disabled':'')+'>'+he(x.n)+' (−'+x.c+')'+(left>0?' · '+left+'y':'')+'</button>'}).join('');
+ w.innerHTML='<b>Market — buy with your wealth</b><div class="hint" style="margin:4px 0 6px">Your economy unlocks '+(tier+1)+' of '+TIERS.length+' purchase tiers'+(next?' · next tier at GDP '+next[0]+' (now '+s.gdp.toFixed(0)+')':' · all unlocked')+'. Richer countries attract bigger crises too, so keep a reserve. Hover a button for details.</div><div class="g">'+rows+'</div>';
+ const anchor=P.querySelector('#moreIncome')||P.querySelector('#survivalEconomyOptions');if(anchor)anchor.after(w);else P.appendChild(w);
+ w.onclick=e=>{const b=e.target.closest('button[data-shop]');if(!b)return;const x=SHOP.find(i=>i.k==b.dataset.shop);if(!x)return;
+  if(G.year<(s.shop[x.k]||0))return toast('Not ready yet');if(s.tre<x.c)return toast('Treasury too low');
+  s.tre-=x.c;x.run(s);s.shop[x.k]=G.year+x.cd;coin();const t='Bought: '+x.n;toast(t);lg(t,0);buildBar();rf()}};
+{const _p=panel;panel=function(k){const r=_p.apply(this,arguments);if(k=='country'){try{build()}catch(e){}try{buildShop()}catch(e){}}return r}}
 }
 
 
@@ -4841,6 +4932,93 @@ body.sv #sbar #advisorToggle.on{background:var(--ac);color:var(--ax)}
   adv.addEventListener('pointermove',e=>{if(!drag||drag.id!==e.pointerId)return;const r=adv.getBoundingClientRect(),left=clamp(e.clientX-drag.dx,8,Math.max(8,innerWidth-r.width-8)),top=clamp(e.clientY-drag.dy,48,Math.max(48,innerHeight-Math.min(r.height,innerHeight-56)-8));document.documentElement.style.setProperty('--pewAdvLeft',left+'px');document.documentElement.style.setProperty('--pewAdvTop',top+'px')});
   const end=e=>{if(!drag||drag.id!==e.pointerId)return;drag=null;const r=adv.getBoundingClientRect();try{localStorage.setItem('pewAdvisorPosition',JSON.stringify({left:r.left,top:r.top,width:r.width}))}catch(_){} };
   adv.addEventListener('pointerup',end);adv.addEventListener('pointercancel',end);
+})();
+</script>
+<style id="pewUiStyle">
+#svp,#adv,#brief,#dfP,#pvP,#qs,#gsr{border-radius:10px!important;box-shadow:0 8px 28px rgba(0,0,0,.30)!important}
+#svp button,#adv button,#wheel button,#gsr button{border-radius:6px!important;transition:background .12s,transform .06s}
+#svp button:active,#adv button:active,#gsr button:active{transform:translateY(1px)}
+#svp,#adv,#brief{scrollbar-width:thin;resize:both}
+#svp>.g:first-child,#adv>h4,#brief>:first-child{cursor:move;touch-action:none;user-select:none}
+#adv .advbar{display:flex;gap:4px;margin:0 0 7px}#adv .advbar button{flex:1;margin:0;padding:5px 4px;font-size:11px}
+#adv .advbar .advrec{flex:1.6;font-weight:700;background:var(--ac)!important;color:var(--ax)!important}
+#adv .ad{border-radius:6px}#adv .crisis{border-radius:6px}#adv .crisis button{margin-top:4px}
+.pewFlash{outline:3px solid #ffb020!important;outline-offset:2px;animation:pewPulse .7s ease-in-out 4}
+@keyframes pewPulse{50%{outline-color:transparent}}
+#gsearch{width:min(250px,22vw);margin-left:8px;padding:4px 9px;border-radius:14px;border:1px solid var(--bd);background:var(--bt);color:var(--tx);font-size:12px}
+#gsr{position:fixed;z-index:90;width:min(340px,92vw);max-height:60vh;overflow:auto;background:var(--pn);color:var(--tx);border:1px solid var(--bd);padding:4px}
+#gsr[hidden]{display:none}#gsr button{display:flex;width:100%;text-align:left;margin:1px 0;padding:6px 8px;gap:8px;background:transparent;color:var(--tx);border:0;font-size:12px}
+#gsr button.on,#gsr button:hover{background:var(--ac);color:var(--ax)}#gsr button i{margin-left:auto;font-style:normal;opacity:.6;font-size:10px}
+#gsr .hint{padding:6px 8px}
+</style>
+<script id="pewUiOverhaul">
+(()=>{
+const $=s=>document.querySelector(s),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const WINS=['#adv','#svp','#brief','#dfP','#pvP'];let zTop=40,drag=null;
+const put=(el,l,t)=>{el.style.setProperty('left',l+'px','important');el.style.setProperty('top',t+'px','important');el.style.setProperty('right','auto','important');el.style.setProperty('bottom','auto','important')};
+const key=el=>'pewWin:'+el.id;
+function restore(el){try{const s=JSON.parse(localStorage.getItem(key(el))||'null');if(s&&innerWidth>700){const r=el.getBoundingClientRect();put(el,clamp(s.l,0,Math.max(0,innerWidth-80)),clamp(s.t,0,Math.max(0,innerHeight-60)))}}catch(e){}}
+window.addEventListener('pointerdown',e=>{
+ const el=WINS.map($).find(w=>w&&!w.hidden&&w.contains(e.target));if(!el)return;
+ if(zTop<58)zTop++;el.style.setProperty('z-index',zTop,'important');
+ if(innerWidth<=700||e.button!==0)return;
+ if(e.target.closest('button,input,select,a,textarea,canvas,label,table,[contenteditable]'))return;
+ const r=el.getBoundingClientRect(),h=el.firstElementChild,inHead=h&&h.contains(e.target),top=e.clientY-r.top<26;
+ if(!inHead&&!top)return;
+ if(e.offsetX>r.width-16&&e.clientY>r.bottom-16)return;
+ drag={el,dx:e.clientX-r.left,dy:e.clientY-r.top,id:e.pointerId};window.__pewDragging=el;
+ e.stopImmediatePropagation();e.preventDefault();
+},true);
+window.addEventListener('pointermove',e=>{if(!drag)return;const r=drag.el.getBoundingClientRect();
+ put(drag.el,clamp(e.clientX-drag.dx,0,Math.max(0,innerWidth-r.width)),clamp(e.clientY-drag.dy,0,Math.max(0,innerHeight-60)))},true);
+const end=()=>{if(!drag)return;const r=drag.el.getBoundingClientRect();try{localStorage.setItem(key(drag.el),JSON.stringify({l:r.left,t:r.top}))}catch(_){}drag=null;window.__pewDragging=null};
+window.addEventListener('pointerup',end,true);window.addEventListener('pointercancel',end,true);
+window.addEventListener('resize',()=>WINS.map($).forEach(el=>{if(!el||!el.style.left)return;const r=el.getBoundingClientRect();put(el,clamp(r.left,0,Math.max(0,innerWidth-r.width)),clamp(r.top,0,Math.max(0,innerHeight-60)))}));
+setTimeout(()=>WINS.map($).forEach(el=>el&&restore(el)),400);
+
+/* ---------- search: actions, panels, countries ---------- */
+const bar=$('#bar');if(!bar)return;
+const inp=document.createElement('input');inp.id='gsearch';inp.type='text';inp.autocomplete='off';inp.placeholder='Search  (Ctrl+K)  propaganda, conscript, alliance…';
+const brand=bar.querySelector('.brand');brand?brand.after(inp):bar.prepend(inp);
+const box=document.createElement('div');box.id='gsr';box.hidden=true;document.body.append(box);
+const ACT=[
+['Propaganda campaign','[data-a="pro"]','public support loyalty rally'],['Conscript troops','[data-t="draft"]','draft conscription soldiers call up'],
+['Hire mercenaries','[data-t="buy"]','mercs soldiers'],['Loyalty program','[data-a="pol"]','people happy'],['Build infrastructure','[data-a="inf"]','roads'],
+['Fund research','[data-a="res"]','tech science'],['Raise new army','[data-a="raise"]','recruit'],['Counter-intelligence','[data-a="ci"]','spy defense'],
+['Blockade','[data-a="blk"]','port trade'],['Ask allies to join my wars','[data-a="join"]','help'],['Tax rate','#tx','taxes income'],['Market / wealth shop','#wealthShop','buy economy fund'],
+['Alliance','[data-d="ally"]','ally pact'],['Non-aggression pact','[data-d="nap"]','peace treaty'],['Trade deal','[data-d="trade"]','commerce'],['Sanction','[data-d="sanc"]','embargo'],
+['Spy','[data-d="spy"]','espionage'],['Sabotage','[data-d="sab"]',''],['Incite unrest','[data-d="inc"]','rebellion'],['Declare war','[data-d="war"]','attack conquer'],
+['Demand vassal','[data-d="vas"]','subject'],['Peace','[data-d="peace"]','end war'],
+['Emergency reconciliation','ADV:[data-rec]','stability loyalty crisis'],['Advisors','ADV:','advice help'],['National Standdown','ADV:button','emergency demobilise']];
+const PAN=[['World panel','world'],['Country panel','country'],['Diplomacy panel','dip'],['Army panel','army'],['Technology panel','tech']];
+const vis=el=>{const r=el.getBoundingClientRect();return r.width>0&&r.height>0};
+let res=[],sel=0;
+function flash(el){if(!el)return;el.scrollIntoView({block:'center',behavior:'smooth'});el.classList.add('pewFlash');setTimeout(()=>el.classList.remove('pewFlash'),3200)}
+function openAdv(){const a=$('#adv');if(a&&a.hidden){a.hidden=false;const t=$('#advisorToggle');t&&t.classList.add('on')}if(a&&a.classList.contains('min')){const b=a.querySelector('#advt');b&&b.click()}return a}
+function showGroup(el){const P=$('#svp'),g=el.closest('[data-grp]');if(!g||!P.dataset.g||g.dataset.grp===P.dataset.g)return;P.dataset.g=g.dataset.grp;P.querySelectorAll('#cgrp button,#ptabs button').forEach(b=>{if(b.id!='pmin')b.classList.toggle('on',b.textContent.trim().toLowerCase()==g.dataset.grp)})}
+function runAct(a){
+ if(!(window.G&&G.on)){toast('Start a Survival game to use this');return}
+ if(a[1].startsWith('ADV:')){const adv=openAdv();setTimeout(()=>{const s=a[1].slice(4);flash(s?[...adv.querySelectorAll(s)].find(b=>a[0].toLowerCase().split(' ').some(w=>w.length>3&&b.textContent.toLowerCase().includes(w)))||adv.querySelector(s):adv)},50);return}
+ for(const k of ['country','army','dip','tech','world']){panel(k);const P=$('#svp'),el=P.querySelector(a[1]);if(el){showGroup(el);setTimeout(()=>flash(el),80);return}}
+ toast(a[0]+' is not available right now')}
+function goC(c){if(window.G&&G.on&&c.id!=G.pid){G.dcSel=c.id;panel('dip')}try{const k=capOf(c)||items.find(i=>i.type=='a'&&i.cid==c.id);if(k){cam.x=k.x-cv.clientWidth/2/cam.z;cam.y=k.y-cv.clientHeight/2/cam.z;ZT=null}}catch(e){}}
+function build(q){q=q.trim().toLowerCase();const out=[],sc=(n,kw)=>{n=n.toLowerCase();return n.startsWith(q)?3:n.includes(q)?2:(kw||'').includes(q)?1:0};
+ if(!q)return[];
+ ACT.forEach(a=>{const s=sc(a[0],a[2]);if(s)out.push({s:s+.5,n:a[0],t:'action',f:()=>runAct(a)})});
+ PAN.forEach(p=>{const s=sc(p[0],'');if(s)out.push({s:s+.5,n:p[0],t:'panel',f:()=>{if(window.G&&G.on)panel(p[1]);else toast('Start a Survival game first')}})});
+ const seen=new Set(out.map(o=>o.n.toLowerCase()));
+ document.querySelectorAll('#svp button,#adv button,#sbar button').forEach(b=>{const n=b.textContent.trim();if(n.length<2||n.length>44||seen.has(n.toLowerCase())||!vis(b))return;const s=sc(n,'');if(s){seen.add(n.toLowerCase());out.push({s,n,t:'button',f:()=>{const adv=b.closest('#adv');if(adv)openAdv();flash(b)}})}});
+ try{countries.forEach(c=>{const s=sc(c.name,'');if(s)out.push({s:s-.2,n:c.name,t:'country',f:()=>goC(c)})})}catch(e){}
+ return out.sort((a,b)=>b.s-a.s||a.n.localeCompare(b.n)).slice(0,10)}
+function draw(){box.innerHTML='';if(!res.length){box.innerHTML='<div class="hint">'+(inp.value.trim()?'No match':'Type to search actions, panels and countries')+'</div>'}
+ res.forEach((r,i)=>{const b=document.createElement('button');b.className=i==sel?'on':'';b.innerHTML='<span></span><i>'+r.t+'</i>';b.firstChild.textContent=r.n;b.onmousedown=e=>{e.preventDefault();pick(i)};box.append(b)});
+ const r=inp.getBoundingClientRect();box.style.left=clamp(r.left,6,innerWidth-box.offsetWidth-6)+'px';box.style.top=(r.bottom+6)+'px';box.hidden=false}
+function pick(i){const r=res[i];if(!r)return;box.hidden=true;inp.blur();r.f()}
+inp.addEventListener('input',()=>{res=build(inp.value);sel=0;draw()});
+inp.addEventListener('focus',()=>{res=build(inp.value);draw()});
+inp.addEventListener('blur',()=>setTimeout(()=>box.hidden=true,120));
+inp.addEventListener('keydown',e=>{e.stopPropagation();if(e.key=='ArrowDown'){sel=Math.min(res.length-1,sel+1);draw();e.preventDefault()}else if(e.key=='ArrowUp'){sel=Math.max(0,sel-1);draw();e.preventDefault()}else if(e.key=='Enter')pick(sel);else if(e.key=='Escape'){box.hidden=true;inp.blur()}},true);
+window.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()=='k'){e.preventDefault();e.stopPropagation();inp.focus();inp.select()}},true);
 })();
 </script>
 </body></html>
