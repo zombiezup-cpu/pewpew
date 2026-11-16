@@ -2298,8 +2298,19 @@ function advise(){const box=Q('#adv'),P=G.ST[G.pid],pc=ctry(G.pid);if(!box)retur
  if(!wars.length&&P.tre>80)add(4,'Treasurer','Treasury surplus ('+P.tre.toFixed(0)+'). Invest it while times are peaceful.',['Institute (−45)',spend(45,()=>P.bd.l++)],['Barracks (−30)',spend(30,()=>P.bd.b++)],roads);
  if(!A.length)add(0,'Council','No urgent issues. Grow the economy, keep alliances, and watch tension in the World panel.');
  A.sort((a,b)=>b.p-a.p);const top=A.slice(0,6);
- box.innerHTML='<h4>Advisors<button id="advt">'+(box.classList.contains('min')?'Show':'Hide')+'</button></h4>'+alertHtml+top.map((a,i)=>'<div class="ad"><b'+(a.p>=8?' class="u"':'')+'>'+a.who+'</b> '+esc(a.txt)+'<br>'+a.b.map((x,j)=>'<button data-i="'+i+'" data-j="'+j+'">'+esc(x[0])+'</button>').join('')+'</div>').join('');
+ /* always-visible status (Good / Mid / Bad), notifications and quick actions, whatever the country's condition */
+ const lvl=(v,g,m)=>v>=g?['Good','#3a9d4a']:v>=m?['Mid','#d28b16']:['Bad','#d33'];
+ const stRows=[['Stability',P.stab,lvl(P.stab,60,30)],['Loyalty',P.loy,lvl(P.loy,55,35)],['Food',P.food,lvl(P.food,40,22)],['Treasury',P.tre,lvl(P.tre,60,20)],['Morale',P.mor,lvl(P.mor,60,35)]].filter(r=>r[1]!=null&&!isNaN(r[1]));
+ const statusHtml='<div class="ad"><b>Status</b><div style="display:grid;grid-template-columns:1fr auto auto;gap:2px 8px;margin-top:3px">'+stRows.map(r=>'<span>'+r[0]+'</span><span>'+r[1].toFixed(0)+'</span><b style="color:'+r[2][1]+'">'+r[2][0]+'</b>').join('')+'</div></div>';
+ const recent=(G.major||[]).slice(-5).reverse();
+ const pendingOffers=(G.offers||[]).filter(o=>Number(o.to??G.pid)===Number(G.pid)).length;
+ const notifHtml='<div class="ad"><b>Notifications</b>'+(pendingOffers?' <span class="u">('+pendingOffers+' pending offer'+(pendingOffers>1?'s':'')+')</span>':'')+(recent.length?'<div style="margin-top:3px">'+recent.map(t=>'<div class="hint" style="padding:1px 0">• '+esc(t)+'</div>').join('')+'</div>':'<div class="hint">No recent events.</div>')+'<button data-nb="1">Open Alerts</button></div>';
+ const quick=[recruit,fort,roads,loyp,prop,['Import grain (−30)',spend(30,()=>P.food=cl(P.food+25))],['Build infrastructure (−30)',spend(30,()=>P.infra=cl(P.infra+6))],['Institute (−45)',spend(45,()=>P.bd.l++)],['Barracks (−30)',spend(30,()=>P.bd.b++)],['Lower tax to '+Math.max(5,P.tax-5)+'%',()=>{P.tax=Math.max(5,P.tax-5);buildBar();advise()}],['Emergency reconciliation (−25)',()=>{if(G.year<(P.reliefYear||0))return toast('Reconciliation available in '+(P.reliefYear-G.year)+' year(s)');if(P.tre<25)return toast('Treasury too low for reconciliation');P.tre-=25;P.stab=cl(P.stab+15);P.loy=cl(P.loy+12);P.mor=cl(P.mor+10);P.food=cl(P.food+5);P.infl=cl(P.infl-1,0,60);P.reliefYear=G.year+2;G.crisisYears=0;buildBar();advise()}]];
+ const quickHtml='<div class="ad"><b>Quick actions</b><br>'+quick.map((x,k)=>'<button data-q="'+k+'">'+esc(x[0])+'</button>').join('')+'</div>';
+ box.innerHTML='<h4>Advisors<button id="advt">'+(box.classList.contains('min')?'Show':'Hide')+'</button></h4>'+alertHtml+statusHtml+notifHtml+top.map((a,i)=>'<div class="ad"><b'+(a.p>=8?' class="u"':'')+'>'+a.who+'</b> '+esc(a.txt)+'<br>'+a.b.map((x,j)=>'<button data-i="'+i+'" data-j="'+j+'">'+esc(x[0])+'</button>').join('')+'</div>').join('')+quickHtml;
  box.querySelectorAll('button[data-i]').forEach(b=>b.onclick=()=>top[+b.dataset.i].b[+b.dataset.j][1]());
+ box.querySelectorAll('button[data-q]').forEach(b=>b.onclick=()=>quick[+b.dataset.q][1]());
+ box.querySelectorAll('button[data-nb]').forEach(b=>b.onclick=()=>{const a=Q('#belb');if(a)a.click()});
  Q('#advt').onclick=()=>{box.classList.toggle('min');advise()}}
 {const _ov=over;over=function(){_ov.apply(this,arguments);advise()}}
 
