@@ -2,7 +2,15 @@
 // Run:  node server.js        then open http://localhost:8080
 // Put this file next to the game HTML. Env: PORT, GAME_FILE.
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto');
-const PORT = process.env.PORT || 8080;
+const zlib = require('zlib');
+const PORT = Number(process.env.PORT) || 8080;
+const HOST = process.env.HOST || '0.0.0.0';
+const MAX_CLIENTS = Number(process.env.MAX_CLIENTS) || 2000;   // total open sockets
+const MAX_PER_IP = Number(process.env.MAX_PER_IP) || 25;       // sockets per IP address
+const MAX_ROOMS = Number(process.env.MAX_ROOMS) || 300;
+const TRUST_PROXY = process.env.TRUST_PROXY !== '0';           // read client IP from X-Forwarded-For (Render/Railway/Fly/Nginx)
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean); // empty = any origin
+const STALE_MS = 75000;                                         // drop sockets silent for this long (browsers auto-answer pings)
 
 function gameFile() {
   if (process.env.GAME_FILE) return process.env.GAME_FILE;
@@ -106,6 +114,7 @@ function onMsg(c, m) {
     case 'list': sendTo(c, { t: 'rooms', rooms: listing() }); break;
     case 'create': {
       if (c.room) leave(c);
+      if (rooms.size >= MAX_ROOMS) return sendTo(c, { t: 'err', m: 'The server is busy. Try again in a minute.' });
       const id = 'r' + nid++;
       const o = cleanOpts(m.o, { map: 'earth', era: 'modern', cm: 'pick', speed: 1, diff: 1, evt: 1, reb: 1, eco: 1, army: 1, cl: [] });
       const nr = { id, code: newCode(), name: str(m.name, 32, 'Lobby') || 'Lobby', pub: !!m.pub, max: num(m.max, 2, 12, 4) | 0, host: c.id, o, players: [c.id], started: false };
@@ -157,7 +166,14 @@ function onMsg(c, m) {
   }
 }
 
+// Per-connection token bucket: protects the server from floods without touching normal play (host sends many small packets).
+function allow(c) {
+  const now = Date.now(); c.tok = Math.min(400, (c.tok === undefined ? 400 : c.tok) + (now - (c.tokAt || now)) * 0.35); c.tokAt = now; if (c.tok > 150) c.over = 0; // only sustained floods get disconnected
+  if (c.tok < 1) { c.over = (c.over || 0) + 1; if (c.over > 2000) c.sock.destroy(); return false; }
+  c.tok -= 1; return true;
+}
 function parse(c) {
+  c.lastSeen = Date.now();
   for (;;) {
     const b = c.buf; if (b.length < 2) return;
     const op = b[0] & 15, fin = b[0] & 128; let len = b[1] & 127, off = 2;
@@ -175,31 +191,63 @@ function parse(c) {
     if (op === 1 || op === 0) {
       if (op === 1) c.frag = [];
       if (c.frag) c.frag.push(p);
-      if (fin && c.frag) { const buf = Buffer.concat(c.frag); c.frag = null; if (buf[0] === 0x52 && buf[1] === 0x7c) rawRelay(c, buf); else { try { onMsg(c, JSON.parse(buf.toString())); } catch (e) { } } }
+      if (fin && c.frag) { const buf = Buffer.concat(c.frag); c.frag = null; if (!allow(c)) continue; if (buf[0] === 0x52 && buf[1] === 0x7c) rawRelay(c, buf); else { try { onMsg(c, JSON.parse(buf.toString())); } catch (e) { } } }
     }
   }
 }
 
+// ---- static game file: read once, pre-compressed, ETag + 304 so repeat visits are instant ----
+let page = null;
+function loadPage() {
+  try {
+    const raw = fs.readFileSync(gameFile());
+    page = { raw, gz: zlib.gzipSync(raw, { level: 9 }), br: zlib.brotliCompressSync(raw, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 9 } }),
+      etag: '"' + crypto.createHash('sha1').update(raw).digest('hex').slice(0, 20) + '"', at: Date.now() };
+    console.log('Loaded game file: ' + (raw.length / 1024 | 0) + ' KB (gzip ' + (page.gz.length / 1024 | 0) + ' KB, brotli ' + (page.br.length / 1024 | 0) + ' KB)');
+  } catch (e) { page = null; console.error('Could not read game file:', e.message); }
+}
+loadPage();
+if (process.env.WATCH === '1') try { fs.watch(gameFile(), () => setTimeout(loadPage, 200)); } catch (e) { }
+const SEC = {
+  'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'SAMEORIGIN',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()'
+};
+const clientIp = req => (TRUST_PROXY && String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()) || req.socket.remoteAddress || '?';
+const ipCount = new Map();
+
 const server = http.createServer((req, res) => {
-  const u = req.url.split('?')[0];
-  if (u === '/lobbies') { res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }); return res.end(JSON.stringify(listing())); }
-  if (u === '/health') { res.writeHead(200); return res.end('ok'); }
+  const u = req.url.split('?')[0], head = req.method === 'HEAD';
+  if (req.method !== 'GET' && !head) { res.writeHead(405, { Allow: 'GET, HEAD' }); return res.end(); }
+  if (u === '/lobbies') { res.writeHead(200, { ...SEC, 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' }); return res.end(head ? undefined : JSON.stringify(listing())); }
+  if (u === '/health' || u === '/healthz') { res.writeHead(200, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' }); return res.end(head ? undefined : 'ok'); }
+  if (u === '/stats') { res.writeHead(200, { ...SEC, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify({ clients: clients.size, rooms: rooms.size, uptime: process.uptime() | 0 })); }
+  if (u === '/favicon.ico') { res.writeHead(204, { 'Cache-Control': 'public, max-age=86400' }); return res.end(); }
+  if (u === '/robots.txt') { res.writeHead(200, { 'Content-Type': 'text/plain' }); return res.end('User-agent: *\nAllow: /\n'); }
   if (u === '/' || /^\/index\.html?$/.test(u)) {
-    fs.readFile(gameFile(), (e, d) => {
-      if (e) { res.writeHead(500); return res.end('Game HTML not found next to server.js'); }
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(d);
-    });
-    return;
+    if (!page) loadPage();
+    if (!page) { res.writeHead(500, { 'Content-Type': 'text/plain' }); return res.end('Game HTML not found next to server.js'); }
+    const h = { ...SEC, 'Content-Type': 'text/html; charset=utf-8', ETag: page.etag, 'Cache-Control': 'no-cache', Vary: 'Accept-Encoding' };
+    if (req.headers['if-none-match'] === page.etag) { res.writeHead(304, h); return res.end(); }
+    const ae = String(req.headers['accept-encoding'] || ''); let body = page.raw;
+    if (/\bbr\b/.test(ae)) { body = page.br; h['Content-Encoding'] = 'br'; } else if (/\bgzip\b/.test(ae)) { body = page.gz; h['Content-Encoding'] = 'gzip'; }
+    h['Content-Length'] = body.length; res.writeHead(200, h); return res.end(head ? undefined : body);
   }
-  res.writeHead(404); res.end('Not found');
+  res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Not found');
 });
+server.keepAliveTimeout = 65000; server.headersTimeout = 70000;
 
 server.on('upgrade', (req, sock) => {
   const key = req.headers['sec-websocket-key'];
   if (req.url.split('?')[0] !== '/ws' || !key) return sock.destroy();
+  const origin = req.headers.origin;
+  if (ALLOWED_ORIGINS.length && origin && !ALLOWED_ORIGINS.includes(origin)) { sock.write('HTTP/1.1 403 Forbidden\r\n\r\n'); return sock.destroy(); }
+  const ip = clientIp(req);
+  if (clients.size >= MAX_CLIENTS || (ipCount.get(ip) || 0) >= MAX_PER_IP) { sock.write('HTTP/1.1 503 Service Unavailable\r\n\r\n'); return sock.destroy(); }
+  ipCount.set(ip, (ipCount.get(ip) || 0) + 1);
+  sock.once('close', () => { const n = (ipCount.get(ip) || 1) - 1; if (n <= 0) ipCount.delete(ip); else ipCount.set(ip, n); });
   sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' +
     crypto.createHash('sha1').update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64') + '\r\n\r\n');
-  const c = { id: 'p' + nid++, sock, name: 'Player', room: null, cid: 0, token: '', disconnectedAt: 0, resumeTimer: null, needsFull: false, buf: Buffer.alloc(0), frag: null };
+  const c = { id: 'p' + nid++, sock, name: 'Player', room: null, cid: 0, token: '', disconnectedAt: 0, resumeTimer: null, needsFull: false, buf: Buffer.alloc(0), frag: null, lastSeen: Date.now(), ip };
   clients.set(c.id, c); sock.setNoDelay(true);
   sock.on('data', d => { c.buf = Buffer.concat([c.buf, d]); parse(c); });
   sock.on('drain', () => { if (c.needsFull && c.room) { c.needsFull = false; sendTo(c, { t: 'resync' }); } });
@@ -214,6 +262,14 @@ server.on('upgrade', (req, sock) => {
   sock.on('error', () => { });
   sendTo(c, { t: 'rooms', rooms: listing() });
 });
-setInterval(() => clients.forEach(c => frame(c, 9, Buffer.alloc(0))), 25000); // keep-alive pings (helps behind proxies)
+setInterval(() => clients.forEach(c => { if (c.sock.destroyed) return; if (Date.now() - c.lastSeen > STALE_MS) return c.sock.destroy(); frame(c, 9, Buffer.alloc(0)); }), 25000); // keep-alive pings + drop dead sockets
+// Sweep empty / orphaned lobbies and finished-but-abandoned games.
+setInterval(() => { for (const r of [...rooms.values()]) { r.players = r.players.filter(id => clients.has(id)); if (!r.players.length || !clients.has(r.host)) { r.players.forEach(id => { const p = clients.get(id); if (p) { p.room = null; sendTo(p, { t: 'closed', why: 'The lobby was closed.' }); } }); rooms.delete(r.id); } } }, 60000);
+function shutdown(sig) {
+  console.log(sig + ' received, closing...');
+  clients.forEach(c => { try { sendTo(c, { t: 'chat', from: '', text: 'Server is restarting. Reconnecting shortly...' }); c.sock.end(); } catch (e) { } });
+  server.close(() => process.exit(0)); setTimeout(() => process.exit(0), 3000).unref();
+}
+process.on('SIGTERM', () => shutdown('SIGTERM')); process.on('SIGINT', () => shutdown('SIGINT'));
 
-server.listen(PORT, () => console.log('PEW PEW GAME server on http://localhost:' + PORT + '  (game: ' + path.basename(gameFile()) + ')'));
+server.listen(PORT, HOST, () => console.log('PEW PEW GAME server on http://localhost:' + PORT + '  (game: ' + path.basename(gameFile()) + ')'));

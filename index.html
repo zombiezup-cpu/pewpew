@@ -1,5 +1,9 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>PEW PEW GAME</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="PEW PEW GAME - a free browser grand-strategy war game. Lead a nation, fight wars, make alliances and play multiplayer with friends.">
+<meta name="theme-color" content="#4a6a52"><meta name="color-scheme" content="light dark">
+<meta property="og:title" content="PEW PEW GAME"><meta property="og:description" content="Free browser grand-strategy war game with online multiplayer."><meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%234a6a52'/%3E%3Ccircle cx='32' cy='32' r='13' fill='none' stroke='white' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='3' fill='white'/%3E%3C/svg%3E">
 <style>
 :root{--bg:#d9d5cb;--pn:#e9e6de;--bt:#f3f1ea;--hv:#dedad0;--tx:#2a2924;--bd:#a39e90;--ac:#4a6a52;--ax:#fff;--rd:#9b3a2e;--mu:#6c685d;--ff:Tahoma,"Segoe UI","Helvetica Neue",Arial,sans-serif;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#191a17;--pn:#232420;--bt:#2c2d28;--hv:#34352f;--tx:#ddd9cb;--bd:#47483f;--ac:#93a883;--ax:#14160f;--rd:#d28375;--mu:#8e8b7e}}
@@ -26,7 +30,7 @@ label{display:flex;justify-content:space-between;align-items:center;gap:6px;marg
 #toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:6px 12px;border-radius:2px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:20}
 @media(max-width:900px){#side{flex-basis:245px}}
 @media(max-width:700px){html,body{height:100%;overflow:hidden}#bar{max-height:34vh;overflow:auto;align-content:flex-start}#main{flex-direction:column}#wrap{flex:1 1 auto;min-height:180px}#side{width:100%;height:min(42vh,380px);flex:0 0 auto;border-left:0;border-top:1px solid var(--bd)}#help{left:3vw!important;right:3vw!important;top:8vh!important;max-width:94vw!important}#ab{max-height:22vh;overflow:auto}}
-</style></head><body>
+</style></head><body><noscript>PEW PEW GAME needs JavaScript enabled.</noscript>
 <header id="bar"><span class="brand">PEW PEW GAME</span>
 <div class="g" id="tools"><button data-t="select">Select</button><button data-t="draw">Draw</button><button data-t="army">Army</button><button data-t="wp">Waypoint</button><button data-t="pan">Pan</button></div>
 <div class="g" id="dopt"><select id="tg"><option value="land">Land</option><option value="sea">Sea</option><option value="claim">Claim territory</option><option value="cut">Cut territory</option><option value="border">Border line</option><option value="unborder">Erase border</option></select>
@@ -1811,7 +1815,7 @@ function launchPublicRally(s){
  toast('Public rallied: loyalty, stability and morale increased');
  return true;
 }
-function startSurvival(pid){G.pid=pid;G.on=1;G.mode='survival';G.year=0;G.crisisYears=0;G.warnLevel=0;G.major=[];G.log=[];G.wars.clear();G.trade.clear();G.rel={};G.wi={};G.vas={};G.offers=[];G.cells={};G.occ={};G.dead={};G.prevOwn=null;G.dec=null;G.mpOver=0;G.hist=[];G.ST={};G.grievances={};G.claimMasks={};
+function startSurvival(pid){G.pid=pid;G.on=1;G.lastDec=[];G.mode='survival';G.year=0;G.crisisYears=0;G.warnLevel=0;G.major=[];G.log=[];G.wars.clear();G.trade.clear();G.rel={};G.wi={};G.vas={};G.offers=[];G.cells={};G.occ={};G.dead={};G.prevOwn=null;G.dec=null;G.mpOver=0;G.hist=[];G.ST={};G.grievances={};G.claimMasks={};
  countries.forEach(c=>initST(c));const _periodWeapon=currentEraWeapon();items.forEach(i=>{if(i.type==='a'){i.weapon=_periodWeapon;i.weaponAnimAt=0;i.weaponAnimKind=''}});alliances=alliances.filter(p=>!p.truce);G.ally0=alliances.filter(p=>p.a==pid||p.b==pid).length;G.ally1=0;
  countries.forEach(c=>G.terr[c.id]=terrOf(c));const s=G.ST[pid];G.start={pop:s.pop,gdp:s.gdp,army:str(pid),tech:avg(s.tech),terr:G.terr[pid],t:Date.now()};
  hideAll();document.body.classList.add('sv');bx.clearRect(0,0,W,H);landD=terrD=1;setTool('select');S.cur=ctry(pid);buildCl();const _a=arms(pid)[0];if(_a){const z=Math.max(cam.z,.9);cam.z=z;cam.x=_a.x-cv.clientWidth/2/z;cam.y=_a.y-cv.clientHeight/2/z;ZT=null}toast('You are '+ctry(pid).name);Q('#sbar').hidden=0;buildBar();if(typeof setWorldPaused=='function')setWorldPaused(false);lg('Survival begins. You rule '+ctry(pid).name,1)}
@@ -1822,7 +1826,23 @@ function declareWar(a,b,byP,goal,claimKey){if(atWar(a,b)||G.vas[a]==b||G.vas[b]=
  goal=goal||pick(['conquest','conquest','border','border','vassal']);G.wi[rk(a,b)]={a,b,goal,y:G.year,c0:Math.max(1,terrOf(ctry(b))),priorRelation,...(goal==='reclaim'?{claimKey}: {})};
  lg(ctry(a).name+' declared war on '+ctry(b).name+' ('+goal+')',a==G.pid||b==G.pid||ally(a,G.pid));
  const nw=id=>[...G.wars].filter(k=>k.split('-').includes(String(id))).length;for(const c of countries)if(c.id!=a&&c.id!=b&&!humanCountry(c.id)&&nw(c.id)<2){if(ally(c.id,b)&&rel(c.id,b)>-20&&R()<.3+G.ST[c.id].mor/400)declareWar(c.id,a);else if(ally(c.id,a)&&R()<.2)declareWar(c.id,b,0,'conquest');else if(ally(c.id,b)&&R()<.25){alliances=alliances.filter(p=>p.truce||!(p.a==c.id&&p.b==b||p.b==c.id&&p.a==b));lg(c.name+' abandoned '+ctry(b).name,1)}}}
-function peace(a,b,why){G.wars.delete(rk(a,b));delete G.wi[rk(a,b)];alliances.push({a:Math.min(a,b),b:Math.max(a,b),truce:1,exp:G.year+8});for(const u of arms(a).concat(arms(b)))u.moveTarget=null;lg('Peace between '+ctry(a).name+' and '+ctry(b).name+(why?' ('+why+')':''),a==G.pid||b==G.pid);G.ST[a].exh=G.ST[b].exh=0}
+function peace(a,b,why){const _joined=peace._busy?[]:alliesJoinedIn(a,b);G.wars.delete(rk(a,b));delete G.wi[rk(a,b)];alliances.push({a:Math.min(a,b),b:Math.max(a,b),truce:1,exp:G.year+8});for(const u of arms(a).concat(arms(b)))u.moveTarget=null;lg('Peace between '+ctry(a).name+' and '+ctry(b).name+(why?' ('+why+')':''),a==G.pid||b==G.pid);G.ST[a].exh=G.ST[b].exh=0;if(_joined.length)alliesStandDown(a,b,_joined)}
+/* Allies who joined a war: when the main war ends they usually stop fighting, but some keep going depending on circumstances. */
+function alliesJoinedIn(a,b){const out=[];for(const k of G.wars){const[x,y]=k.split('-').map(Number);for(const[c,foe,main,opp] of [[x,y,a,b],[y,x,a,b],[x,y,b,a],[y,x,b,a]]){if(c===a||c===b||foe!==opp)continue;if(ally(c,main)||G.vas[c]==main)out.push({c,foe,main,k})}}
+ const seen=new Set();return out.filter(o=>{if(seen.has(o.k))return false;seen.add(o.k);return true})}
+function alliesStandDown(a,b,list){peace._busy=1;try{for(const o of list){const{c,foe,main,k}=o;if(!G.wars.has(k)||!ctry(c)||!ctry(foe)||humanCountry(c))continue;
+  const sc=G.ST[c],sf=G.ST[foe];if(!sc||!sf)continue;const w=G.wi[k];
+  /* chance that this ally keeps fighting on its own (default: mostly stops) */
+  let keep=.12;
+  if(rel(c,foe)<-60)keep+=.2;else if(rel(c,foe)<-35)keep+=.1;
+  if(w&&w.goal==='reclaim')keep+=.2;
+  if(str(c)>str(foe)*1.5)keep+=.12;else if(str(c)<str(foe)*.6)keep-=.08;
+  if((sc.exh||0)>30)keep-=.15;if((sc.exh||0)>50)keep=0;
+  if((sc.stab||50)<25||(sc.loy||50)<25)keep-=.1;
+  if(Object.values(G.occ||{}).some(q=>q&&((q.to==c&&q.from==foe)||(q.to==foe&&q.from==c))))keep+=.15;
+  keep=Math.max(0,Math.min(.6,keep));
+  if(R()<keep){lg(ctry(c).name+' refuses to stand down and keeps fighting '+ctry(foe).name,c==G.pid||foe==G.pid)}
+  else peace(c,foe,'allies stood down')}}finally{peace._busy=0}}
 function makeVassal(a,b){G.wars.delete(rk(a,b));delete G.wi[rk(a,b)];G.vas[b]=a;alliances.push({a:Math.min(a,b),b:Math.max(a,b),truce:1,exp:G.year+999});for(const u of arms(a).concat(arms(b)))u.moveTarget=null;lg(''+ctry(b).name+' became a vassal of '+ctry(a).name,1);G.ST[b].exh=G.ST[a].exh=0}
 function annex(a,b){const A=ctry(a),B=ctry(b);if(!A||!B)return;const t=document.createElement('canvas');t.width=W;t.height=H;const g=t.getContext('2d');g.drawImage(B.cv,0,0);g.globalCompositeOperation='source-in';g.fillStyle=A.color;g.fillRect(0,0,W,H);A.cx.drawImage(t,0,0);A.cx.dirty=1;A.cx.kd=1;A.cx.dbb='all';A.bb=ALLB;B.cx.clearRect(0,0,W,H);B.cx.dirty=1;B.cx.kd=1;B.cx.dbb='all';uD=1;terrD=1;
  const sa=G.ST[a],sb=G.ST[b],spoils=Math.round(Math.max(0,sb.tre||0)*.5+Math.max(10,(sb.gdp||0)*.08));sa.pop+=sb.pop*.8;sa.gdp+=sb.gdp*.5;sa.tre+=spoils;sb.tre=Math.max(0,(sb.tre||0)-spoils);const u=pick(arms(a));if(u)u.n=String(armyStrength(u)+Math.round(sb.pop*.003));lg(''+A.name+' annexed '+B.name+' — war spoils: +'+fm(spoils)+' treasury',a==G.pid);collapse(B);if(b==G.pid)over('Annexed by '+A.name)}
@@ -2057,7 +2077,37 @@ function resolveAllianceOffer(id,accepted,actor){actor=actor==null?G.pid:Number(
 function requestAllianceUI(from,to){const mp=window.MP;if(mp&&(mp.host||mp.guest)&&typeof mp.requestAlliance=='function')return mp.requestAlliance(to);return aiAllianceRequest(from,to)}
 function answerAllianceUI(o,accepted){if(!o)return false;const mp=window.MP;if(mp&&(mp.host||mp.guest)&&typeof mp.answerAlliance=='function')return mp.answerAlliance(o.id,accepted);return resolveAllianceOffer(o.id,accepted,G.pid)}
 function event(c,s,p){const E=[['Economic crash',()=>{s.gdp*=.86;s.tre*=.78;s.stab-=5;s.infl+=3}],['Famine',()=>{s.food-=28;s.pop*=.985;s.loy-=5}],['Natural disaster',()=>{s.infra-=6;s.pop*=.99;s.loy-=2}],['Pandemic',()=>{s.pop*=.97;s.gdp*=.96;s.mor-=5}],['Political crisis',()=>{s.stab-=9;s.fac.Populists+=9}],['Resource discovery',()=>{s.res+=25;s.gdp*=1.06}],['Technological breakthrough',()=>{const i=R()*11|0;s.tech[i]=cl(s.tech[i]+6)}],['Leadership change',()=>{s.stab+=pick([-8,8]);s.gens++;if(R()<.3)s.gov=pick(GOV)}],['Revolution',()=>{s.stab-=13;s.loy-=8}],['Resource shortage',()=>{s.res-=20;s.ind-=3}],['Diplomatic crisis',()=>{const o=pick(countries);if(o.id!=c.id)addRel(c.id,o.id,-22)}],['Currency crisis',()=>{s.infl+=5;s.tre*=.88}]];
- const e=pick(E);e[1]();lg(e[0]+' in '+c.name,p)}
+ const E2=[
+ ['Bumper harvest',()=>{s.food=cl(s.food+22);s.loy=cl(s.loy+3)}],
+ ['Gold rush',()=>{s.tre+=25;s.gdp*=1.03;s.infl+=1}],
+ ['Trade boom',()=>{s.gdp*=1.07;s.tre+=12}],
+ ['Cultural golden age',()=>{s.loy=cl(s.loy+7);s.stab=cl(s.stab+4);s.mor=cl(s.mor+4)}],
+ ['Scientific society founded',()=>{const i=R()*11|0;s.tech[i]=cl(s.tech[i]+4);s.tech[(i+3)%11]=cl(s.tech[(i+3)%11]+2)}],
+ ['Earthquake',()=>{s.infra=cl(s.infra-8);s.pop*=.992;s.tre*=.94;s.loy=cl(s.loy-2)}],
+ ['Great flood',()=>{s.food=cl(s.food-14);s.infra=cl(s.infra-4);s.pop*=.995}],
+ ['Drought',()=>{s.food=cl(s.food-20);s.gdp*=.97;s.loy=cl(s.loy-3)}],
+ ['Plague outbreak',()=>{s.pop*=.975;s.mor=cl(s.mor-4);s.gdp*=.97;s.stab=cl(s.stab-2)}],
+ ['Factory disaster',()=>{s.ind=cl(s.ind-5);s.loy=cl(s.loy-3);s.tre*=.97}],
+ ['Corruption scandal',()=>{s.stab=cl(s.stab-6);s.tre*=.9;s.rep=cl(s.rep-3)}],
+ ['General strike',()=>{s.gdp*=.95;s.loy=cl(s.loy-5);s.stab=cl(s.stab-3)}],
+ ['Spy ring uncovered',()=>{s.stab=cl(s.stab+2);s.mor=cl(s.mor+2);const o=pick(countries);if(o&&o.id!=c.id)addRel(c.id,o.id,-12)}],
+ ['Royal wedding',()=>{s.loy=cl(s.loy+5);const o=pick(countries);if(o&&o.id!=c.id)addRel(c.id,o.id,14)}],
+ ['Military reforms',()=>{s.xp=cl(s.xp+6);s.mor=cl(s.mor+4);s.tre*=.95}],
+ ['Banking panic',()=>{s.tre*=.85;s.infl+=3;s.gdp*=.97}],
+ ['Refugee wave',()=>{s.pop*=1.01;s.food=cl(s.food-6);s.stab=cl(s.stab-2);s.gdp*=1.01}],
+ ['Religious revival',()=>{s.loy=cl(s.loy+4);s.stab=cl(s.stab+3);s.gdp*=.99}],
+ ['Student protests',()=>{s.stab=cl(s.stab-4);s.loy=cl(s.loy-3);s.fac.Populists=cl((Number(s.fac.Populists)||0)+6)}],
+ ['Grand infrastructure project',()=>{s.infra=cl(s.infra+7);s.tre*=.93;s.loy=cl(s.loy+2)}],
+ ['Energy discovery',()=>{s.res=cl(s.res+18);s.ind=cl(s.ind+3);s.gdp*=1.04}],
+ ['Coup attempt foiled',()=>{s.stab=cl(s.stab-5);s.mor=cl(s.mor-3);s.xp=cl(s.xp-2)}],
+ ['Foreign investment',()=>{s.tre+=18;s.gdp*=1.03;s.infra=cl(s.infra+2)}],
+ ['Bandit raids',()=>{s.loy=cl(s.loy-2);s.tre*=.97;s.infra=cl(s.infra-2)}],
+ ['National festival',()=>{s.mor=cl(s.mor+6);s.loy=cl(s.loy+4);s.tre*=.97}]];
+ const all=E.concat(E2);s.lastEv=s.lastEv||[];
+ let pool=all.filter(x=>!s.lastEv.includes(x[0]));if(!pool.length)pool=all;
+ const e=pick(pool);e[1]();s.lastEv.push(e[0]);if(s.lastEv.length>8)s.lastEv.shift();
+ for(const k of ['food','res','infra','ind','stab','mor','loy','xp','rep'])if(typeof s[k]=='number')s[k]=cl(s[k]);
+ lg(e[0]+' in '+c.name,p)}
 function rebel(c,s){const a=pick(arms(c.id));if(!a)return;const n=armyStrength(a),nc=addCountry(c.name+' Rebels',rc(),c.flag),h=Math.max(1,n/2|0);a.n=String(n-h);const b={...a,gen:null,id:uid++,cid:nc.id,n:String(h),x:a.x+25,y:a.y+15,weapon:currentEraWeapon(),weaponAnimAt:0,weaponAnimKind:'',moveTarget:null};items.push(b);G.ST[nc.id]=JSON.parse(JSON.stringify(s));Object.assign(G.ST[nc.id],{pop:s.pop*.1,loy:50,stab:40,gov:'Junta'});s.pop*=.9;s.loy+=10;declareWar(nc.id,c.id);lg(''+c.name+' regions rebel — new faction: '+nc.name,c.id==G.pid);buildCl();buildAllies()}
 function tick(){if(window.MPG)return;if(!window.MPH&&(!G.on||G.dec||worldPaused||Q('#sv').hidden==0||Q('#mm').hidden==0))return;G.year++;const P=G.ST[G.pid];
  for(const c of countries.slice()){const s=G.ST[c.id]||initST(c)||G.ST[c.id],A=arms(c.id),n=str(c.id),war=[...G.wars].filter(k=>k.split('-').includes(String(c.id))).length,isP=humanCountry(c.id);
@@ -2171,7 +2221,31 @@ function decide(){const s=G.ST[G.pid];if(!s||G.dec||G.mpOver||R()>.07)return;con
  ['Foreign scholars arrive','They offer to teach at your court.',[['Fund them (−25 treasury)',()=>{s.tre-=25;s.tech=s.tech.map(t=>cl(t+2))}],['Decline',()=>{}]]],
  ['Officers grumble','Senior officers want more influence.',[['Promote them (−15 treasury, +8 morale)',()=>{s.tre-=15;s.mor=cl(s.mor+8)}],['Purge the ranks (−5 stability)',()=>{s.stab=cl(s.stab-5);s.xp=cl(s.xp-5)}]]]];
  if(o)D.push(['Border incident: '+o.name,'Soldiers exchanged fire at the frontier.',[['Declare war (conquest)',()=>declareWar(G.pid,o.id,1,'conquest')],['Apologise (−reputation)',()=>{s.rep=cl(s.rep-4);addRel(G.pid,o.id,15)}],['Demand compensation',()=>{if(R()<.5){s.tre+=20;addRel(G.pid,o.id,-10)}else addRel(G.pid,o.id,-25)}]]]);
- G.dec=pick(D);setWorldPaused(true);panel('dec')}
+ const atw=[...G.wars].some(k=>k.split('-').includes(String(G.pid))),A=arms(G.pid);
+ D.push(
+ ['Plague rumours','Sailors report sickness in the port cities.',[['Quarantine the ports (−15 treasury)',()=>{s.tre-=15;s.gdp*=.99;s.pop*=.999}],['Fund doctors (−25 treasury, +morale)',()=>{s.tre-=25;s.mor=cl(s.mor+5)}],['Ignore it',()=>{if(R()<.5){s.pop*=.97;s.mor=cl(s.mor-5)}}]]],
+ ['Bountiful harvest','Farmers report a surplus this year.',[['Store the grain (+15 food)',()=>{s.food=cl(s.food+15)}],['Export it (+25 treasury)',()=>{s.tre+=25}],['Hold a feast (+loyalty)',()=>{s.loy=cl(s.loy+6);s.mor=cl(s.mor+3);s.food=cl(s.food+5)}]]],
+ ['Inventor seeks patronage','A brilliant inventor needs funding.',[['Fund the workshop (−30 treasury)',()=>{s.tre-=30;const i=R()*11|0;s.tech[i]=cl(s.tech[i]+5)}],['Offer a small grant (−10 treasury)',()=>{s.tre-=10;if(R()<.5){const i=R()*11|0;s.tech[i]=cl(s.tech[i]+3)}}],['Send them away',()=>{}]]],
+ ['Foreign loan offer','Bankers offer you a large loan on harsh terms.',[['Take the loan (+60 treasury, +3 inflation)',()=>{s.tre+=60;s.infl+=3}],['Negotiate (gamble)',()=>{if(R()<.5){s.tre+=40;s.infl+=1}else{s.rep=cl(s.rep-3)}}],['Decline',()=>{}]]],
+ ['Press freedom dispute','Newspapers are criticising the government.',[['Censor the press (+4 stability, −6 loyalty)',()=>{s.stab=cl(s.stab+4);s.loy=cl(s.loy-6)}],['Allow it (+6 loyalty, −3 stability)',()=>{s.loy=cl(s.loy+6);s.stab=cl(s.stab-3)}],['Offer official briefings (−8 treasury)',()=>{s.tre-=8;s.loy=cl(s.loy+2)}]]],
+ ['River flood','A great river has burst its banks.',[['Build levees (−25 treasury)',()=>{s.tre-=25;s.infra=cl(s.infra+3)}],['Evacuate and rebuild',()=>{s.pop*=.995;s.loy=cl(s.loy-2);s.infra=cl(s.infra-2)}],['Do nothing',()=>{s.food=cl(s.food-14);s.infra=cl(s.infra-6);s.loy=cl(s.loy-4)}]]],
+ ['Public works proposal','Engineers propose a grand canal and road network.',[['Approve (−40 treasury)',()=>{s.tre-=40;s.infra=cl(s.infra+7);s.loy=cl(s.loy+3)}],['Scale it down (−15 treasury)',()=>{s.tre-=15;s.infra=cl(s.infra+3)}],['Reject it',()=>{}]]],
+ ['Black market thrives','Smugglers are moving goods untaxed.',[['Crack down (−5 loyalty, +10 treasury)',()=>{s.loy=cl(s.loy-5);s.tre+=10}],['Tax it quietly (+15 treasury, −3 reputation)',()=>{s.tre+=15;s.rep=cl(s.rep-3)}],['Look away',()=>{s.gdp*=1.005}]]],
+ ['Separatist leader','A regional leader demands autonomy.',[['Grant autonomy (−4 stability, +8 loyalty)',()=>{s.stab=cl(s.stab-4);s.loy=cl(s.loy+8)}],['Arrest them (+3 stability, −8 loyalty)',()=>{s.stab=cl(s.stab+3);s.loy=cl(s.loy-8)}],['Negotiate (gamble)',()=>{if(R()<.55)s.loy=cl(s.loy+4);else{s.stab=cl(s.stab-6);s.loy=cl(s.loy-5)}}]]],
+ ['Corrupt governor','A provincial governor is skimming taxes.',[['Remove him (−3 stability)',()=>{s.stab=cl(s.stab-3);s.tre+=12;s.loy=cl(s.loy+3)}],['Demand a cut',()=>{s.tre+=15;s.rep=cl(s.rep-4)}],['Overlook it',()=>{s.tre-=8}]]],
+ ['Immigration wave','Families from abroad ask to settle in your lands.',[['Welcome them (+pop, −food)',()=>{s.pop*=1.015;s.food=cl(s.food-6);s.gdp*=1.01}],['Allow skilled workers only',()=>{s.pop*=1.005;s.ind=cl(s.ind+2)}],['Close the border (−reputation)',()=>{s.rep=cl(s.rep-2);s.loy=cl(s.loy+2)}]]],
+ ['Religious dispute','Clergy are split over a doctrinal question.',[['Back the traditionalists (+loyalty, −GDP)',()=>{s.loy=cl(s.loy+5);s.gdp*=.99}],['Back the reformers (+tech, −stability)',()=>{s.stab=cl(s.stab-3);const i=R()*11|0;s.tech[i]=cl(s.tech[i]+3)}],['Stay neutral',()=>{}]]]);
+ if(o)D.push(
+ ['Royal marriage: '+o.name,'Their court proposes a dynastic marriage.',[['Accept (+relations, +loyalty)',()=>{addRel(G.pid,o.id,18);s.loy=cl(s.loy+3)}],['Decline politely',()=>{addRel(G.pid,o.id,-3)}],['Demand a dowry (+20 treasury)',()=>{if(R()<.5){s.tre+=20;addRel(G.pid,o.id,6)}else addRel(G.pid,o.id,-12)}]]],
+ ['Spy caught: '+o.name,'Your agents caught a foreign spy in the capital.',[['Expose them publicly (−relations, +morale)',()=>{addRel(G.pid,o.id,-18);s.mor=cl(s.mor+4)}],['Protest quietly',()=>{addRel(G.pid,o.id,-4)}],['Turn the spy (gamble)',()=>{if(R()<.5){s.stab=cl(s.stab+3);s.tre+=10}else addRel(G.pid,o.id,-12)}]]],
+ ['Embassy from '+o.name,'Envoys arrive offering friendship and trade.',[['Welcome them (+relations, +GDP)',()=>{addRel(G.pid,o.id,12);s.gdp*=1.01}],['Sign a trade deal (−5 treasury)',()=>{s.tre-=5;G.trade.add(rk(G.pid,o.id));addRel(G.pid,o.id,8)}],['Turn them away',()=>{addRel(G.pid,o.id,-6)}]]]);
+ if(A.length)D.push(['Mercenary captain','A veteran captain offers his company.',[['Hire them (−20 treasury, +troops)',()=>{if(s.tre>=20){s.tre-=20;const u=pick(A);u.n=String(armyStrength(u)+Math.max(80,Math.round(armyStrength(u)*.1)))}}],['Refuse',()=>{}]]]);
+ if(atw)D.push(
+ ['Veterans demand pensions','Wounded soldiers are petitioning the court.',[['Grant pensions (−20 treasury, +morale)',()=>{s.tre-=20;s.mor=cl(s.mor+7)}],['Give land grants',()=>{s.loy=cl(s.loy+3);s.food=cl(s.food-3)}],['Refuse',()=>{s.mor=cl(s.mor-6);s.loy=cl(s.loy-3)}]]],
+ ['War weariness','The public tires of the long war.',[['Hold a victory parade (−10 treasury, +morale)',()=>{s.tre-=10;s.mor=cl(s.mor+6);s.ww=Math.max(0,(s.ww||0)-8)}],['Publish casualty lists (honesty)',()=>{s.loy=cl(s.loy-3);s.rep=cl(s.rep+3)}],['Press on',()=>{s.ww=(s.ww||0)+6}]]]);
+ if(s.tre>120)D.push(['Wealthy donors','Rich patrons offer to fund a national project.',[['Build a university (+tech)',()=>{s.tech=s.tech.map(t=>cl(t+2));s.tre-=20}],['Build a harbour (+GDP)',()=>{s.gdp*=1.03;s.tre-=20}],['Refuse their strings',()=>{s.rep=cl(s.rep+2)}]]]);
+ G.lastDec=G.lastDec||[];let pool=D.filter(x=>!G.lastDec.includes(x[0]));if(!pool.length)pool=D;
+ G.dec=pick(pool);G.lastDec.push(G.dec[0]);if(G.lastDec.length>6)G.lastDec.shift();setWorldPaused(true);panel('dec')}
 {const _pk=window.pick;window.pick=function(p){for(let i=items.length-1;i>=0;i--){const t=items[i];if(!G.on)return _pk(p);if(t.type=='a'&&t.cid==G.pid){const m=FSB*flagMul(t);if(Math.abs(p.x-t.x)<(t.weapon?58:40)*m+6&&p.y>t.y-54*m-6&&p.y<t.y+48*m+6)return t}}return null};const _st=setTool;setTool=function(t){if(G.on&&t!='select'&&t!='pan')return;return _st(t)};
  const _fx=drawFx;drawFx=function(now){_fx(now);if(!G.on)return;const x=ctx,cw=W/100,ch=H/62,v=worldViewBounds(0),x0=Math.max(0,Math.floor(v.l/cw)),x1=Math.min(99,Math.ceil(v.r/cw)),y0=Math.max(0,Math.floor(v.t/ch)),y1=Math.min(61,Math.ceil(v.b/ch));if(x1<x0||y1<y0)return;x.save();for(let yy=y0;yy<=y1;yy++)for(let xx=x0;xx<=x1;xx++){const q=G.occ[yy*100+xx];if(!q||(q.to!=G.pid&&q.from!=G.pid))continue;x.fillStyle=q.ctrl<25?'rgba(255,40,40,'+(.25+.3*Math.pow(Math.sin(now/200),2))+')':'rgba(255,170,0,'+(100-q.ctrl)/200+')';x.fillRect(xx*cw,yy*ch,cw,ch)}x.restore()}}
 document.addEventListener('keydown',e=>{if(G.on&&!(e.target.closest&&e.target.closest('#svp,#sv'))&&!['h',' ','escape'].includes(e.key.toLowerCase()))e.stopImmediatePropagation()},true);
