@@ -41,7 +41,7 @@ label{display:flex;justify-content:space-between;align-items:center;gap:6px;marg
 </header>
 <div id="ab" class="g" hidden style="background:var(--pn);border-bottom:1px solid var(--bd);padding:5px 8px"><b>Keyframes</b><span class="g" id="ak"></span><button id="akadd">+ Keyframe</button><button id="aku">Update</button><button id="akd" class="red">Delete</button><label>Seconds from previous <input id="akg" value="2" style="width:50px"></label><button id="akp" class="on">Play / Replay</button><button id="akr">Reset</button></div>
 <div id="main"><div id="wrap"><canvas id="c"></canvas></div>
-<aside id="side"><div id="selp"></div><h3>Countries <button id="addc">+ Add</button></h3><div id="cl"></div><div id="mergeBar" class="g" hidden><button id="mergeCountries" class="on">Combine selected countries</button><span id="mergeCount" class="hint"></span></div>
+<aside id="side"><div id="selp"></div><h3>Countries <button id="addc">+ Add</button></h3><div id="cl"></div><div id="mergeBar" class="g" hidden><button id="mergeCountries" class="on">Combine selected countries</button><button id="groupAlly" title="Creative only: make every selected country allied with all the others">Become allies</button><button id="groupUnally" title="Creative only: remove the alliances between the selected countries">Lose allies</button><span id="mergeCount" class="hint"></span></div>
 <section id="alliesPanel"><h3>Alliances</h3>
 <div class="g"><select id="allyA" aria-label="First country"></select><select id="allyB" aria-label="Second country"></select><button id="allyAdd">+ Link</button></div><div id="allyList"></div></section>
 </aside></div>
@@ -239,10 +239,10 @@ const _TS=new Map();function textSprite(s,font='900 30px system-ui',fill='#ffe06
 let _boom;function boomSprite(){if(_boom)return _boom;const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d');x.translate(64,64);[[56,'#ff5400'],[31,'#ffe066']].forEach(([r,col])=>{x.fillStyle=col;x.beginPath();for(let i=0;i<16;i++){const q=i%2?r*.45:r,a=i/16*TAU;x.lineTo(Math.cos(a)*q,Math.sin(a)*q)}x.closePath();x.fill()});return _boom=c}
 let _gl,_sm;function glowSprite(){if(_gl)return _gl;const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d'),g=x.createRadialGradient(64,64,0,64,64,64);g.addColorStop(0,'rgba(255,250,225,1)');g.addColorStop(.25,'rgba(255,200,110,.85)');g.addColorStop(.6,'rgba(255,120,40,.3)');g.addColorStop(1,'rgba(255,80,20,0)');x.fillStyle=g;x.fillRect(0,0,128,128);return _gl=c}
 function smokeSprite(){if(_sm)return _sm;const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d'),g=x.createRadialGradient(32,32,0,32,32,32);g.addColorStop(0,'rgba(72,68,64,.85)');g.addColorStop(.6,'rgba(90,86,82,.35)');g.addColorStop(1,'rgba(90,86,82,0)');x.fillStyle=g;x.fillRect(0,0,64,64);return _sm=c}
-function bang(x,y,big){return;if(fxs.length>70)return;fxs.push({k:'b',x,y,t:performance.now(),life:big?1100:800,s:big?1.6:1,p:Array.from({length:9},()=>({a:Math.random()*TAU,s:.4+Math.random()*.8,c:['#ff5400','#ffb703','#fff3b0'][Math.random()*3|0]}))})}
+function bang(x,y,big){if(fxs.length>70)return;fxs.push({k:'b',x,y,t:performance.now(),life:big?1100:800,s:big?1.6:1,p:Array.from({length:9},()=>({a:Math.random()*TAU,s:.4+Math.random()*.8,c:['#ff5400','#ffb703','#fff3b0'][Math.random()*3|0]}))})}
 function dust(x,y){return;for(let i=0;i<2;i++)fxs.push({k:'d',x:x+(Math.random()-.5)*24,y,vx:(Math.random()-.5)*2,t:performance.now(),life:600})}
-function float(x,y,s){fxs.push({k:'t',x,y,s,t:performance.now(),life:1000})}
-function hurtCount(u,amount){const n=armyStrength(u);if(!n||!Number.isFinite(amount)||amount<=0)return 0;const lost=Math.min(n,Math.max(1,Math.round(amount))),remaining=n-lost;u.n=String(remaining);float(u.x,u.y-62,'−'+lost.toLocaleString('en-US'));if(S.sel==u&&$('#sn')&&document.activeElement!==$('#sn'))$('#sn').value=lab(u.n,u.displayUnit);if(remaining<=0)death(u);return lost}
+function float(x,y,s,u,amt){const now=performance.now(),loss=/^[\u2212-]/.test(s);if(u&&amt){for(let i=fxs.length-1;i>=0&&i>fxs.length-40;i--){const f=fxs[i];if(f.k==='t'&&f.uid===u.id&&now-f.t<450){f.amt+=amt;f.s='\u2212'+f.amt.toLocaleString('en-US');f.x=x;f.y=y;return}}}fxs.push({k:'t',x,y,s,uid:u?u.id:null,amt:amt||0,t:now,life:loss?1500:1000})}
+function hurtCount(u,amount){const n=armyStrength(u);if(!n||!Number.isFinite(amount)||amount<=0)return 0;const lost=Math.min(n,Math.max(1,Math.round(amount))),remaining=n-lost;u.n=String(remaining);float(u.x,u.y-62,'−'+lost.toLocaleString('en-US'),u,lost);if(S.sel==u&&$('#sn')&&document.activeElement!==$('#sn'))$('#sn').value=lab(u.n,u.displayUnit);if(remaining<=0)death(u);return lost}
 function hurtPct(u,pct){const n=armyStrength(u),rate=Math.max(0,Math.min(100,Number(pct)||0));if(!n||rate<=0)return 0;return hurtCount(u,n*rate/100)}
 function death(u){if(!items.includes(u))return;float(u.x,u.y-80,'DESTROYED');SFX.defeat();del(u,1)}
 function playAttackEffect(at,df,first,withSound=true,delay=0){
@@ -471,7 +471,7 @@ if(arrived){if(S.sel&&S.sel.type==='a')buildSel();commitSoon(80)}}
 function drawArrow(r,al){const x=ctx,dx=r.x2-r.x1,dy=r.y2-r.y1,L=Math.hypot(dx,dy);if(L<30)return;const ux=dx/L,uy=dy/L,nx=-uy,ny=ux,w=10,e=L-30,P=(d,s)=>[r.x1+ux*d+nx*s,r.y1+uy*d+ny*s];
 const pts=[P(0,w*.3),P(e,w*.5),P(e,w*1.5),P(L,0),P(e,-w*1.5),P(e,-w*.5),P(0,-w*.3)];x.save();x.globalAlpha=al*.9;x.fillStyle=r.c;x.strokeStyle='#fff';x.lineWidth=3;x.lineJoin='round';x.beginPath();pts.forEach((p,i)=>i?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));x.closePath();x.stroke();x.fill();x.restore()}
 function drawFx(now){if(window.PEW_PERF&&window.PEW_PERF.effects===false){fxs=fxs.filter(f=>f.k==='t');return}fxs.forEach(f=>{if(now<f.t)return;const fx0=Math.min(f.x,Number.isFinite(f.tx)?f.tx:f.x)-80,fy0=Math.min(f.y,Number.isFinite(f.ty)?f.ty:f.y)-80,fx1=Math.max(f.x,Number.isFinite(f.tx)?f.tx:f.x)+80,fy1=Math.max(f.y,Number.isFinite(f.ty)?f.ty:f.y)+80;if(!worldRectVisible(fx0,fy0,fx1-fx0,fy1-fy0,0))return;const elapsed=Math.max(0,now-f.t),k=Math.min(1,elapsed/f.life),x=ctx;x.save();x.globalAlpha=Math.max(0,1-k);x.translate(f.x,f.y);
-if(f.k==='t'){const T=textSprite(f.s,'500 12px system-ui',/^[\u2212-]/.test(f.s)?'#e8c4be':'#e6e9ec',2);x.drawImage(T,-T.width/2,-T.height/2);x.restore();return}
+if(f.k==='t'){const z=Math.max(.02,cam.z||1),loss=/^[\u2212-]/.test(f.s),px=Math.min(loss?60:40,Math.max(loss?13:10,(loss?18:12)*z)),sc=px/30/z,e=1-(1-k)*(1-k),pop=k<.1?1+.35*(1-k/.1):1,jx=((Math.floor(f.t)%13)/13-.5)*24/z,T=textSprite(f.s,'bold 30px system-ui',loss?'#ff8f86':'#e6e9ec',4);x.globalAlpha=k<.6?1:Math.max(0,1-(k-.6)/.4);x.translate(jx,-34*e/z);x.scale(sc*pop,sc*pop);x.drawImage(T,-T.width/2,-T.height/2);x.restore();return}
 if(f.k==='d'){x.fillStyle='rgba(225,210,180,.8)';x.beginPath();x.arc(f.vx*k*18,-k*14,3+5*k,0,TAU);x.fill();x.restore();return}
 if(f.k==='defeat'){x.strokeStyle='rgba(220,230,240,.8)';x.lineWidth=2;x.beginPath();x.arc(0,0,5+15*k,0,TAU);x.stroke();x.restore();return}
 if(f.k==='sword'){
@@ -801,7 +801,12 @@ function countrySelectOptions(){return countries.slice().sort((a,b)=>a.name.loca
 function editAlliance(index,key,value){const p=alliances[index],next={...p,[key]:value};if(next.a==next.b||alliances.some((q,i)=>i!==index&&((q.a==next.a&&q.b==next.b)||(q.a==next.b&&q.b==next.a)))){toast('That alliance already exists or uses the same country');buildAllies();return}alliances[index]=next;buildAllies();commitSoon()}
 function buildAllies(){const a=$('#allyA'),b=$('#allyB'),list=$('#allyList');if(!a||!b||!list)return;const opts=countrySelectOptions(),alpha=countries.slice().sort((x,y)=>x.name.localeCompare(y.name,undefined,{sensitivity:'base'}));a.innerHTML=opts;b.innerHTML=opts;a.disabled=b.disabled=$('#allyAdd').disabled=countries.length<2;if(alpha.length>1){a.value=String(alpha[0].id);b.value=String(alpha[1].id)}list.innerHTML='';const rows=alliances.map((p,index)=>{const pair=[country(p.a),country(p.b)].filter(Boolean).sort((x,y)=>x.name.localeCompare(y.name,undefined,{sensitivity:'base'}));const firstId=pair[0]?.id??p.a,secondId=pair[1]?.id??p.b;return{p,index,first:pair[0]?.name||'',second:pair[1]?.name||'',firstId,secondId,firstKey:firstId===p.a?'a':'b',secondKey:secondId===p.a?'a':'b'}}).sort((x,y)=>x.first.localeCompare(y.first,undefined,{sensitivity:'base'})||x.second.localeCompare(y.second,undefined,{sensitivity:'base'}));rows.forEach(({p,index,firstId,secondId,firstKey,secondKey})=>{const row=document.createElement('div');row.className='ally-row';const one=document.createElement('select'),two=document.createElement('select'),rm=document.createElement('button');one.innerHTML=opts;two.innerHTML=opts;one.value=String(firstId);two.value=String(secondId);one.title='Change first allied country';two.title='Change second allied country';one.onchange=()=>editAlliance(index,firstKey,+one.value);two.onchange=()=>editAlliance(index,secondKey,+two.value);rm.textContent='×';rm.title='Remove alliance';rm.onclick=()=>{alliances.splice(index,1);buildAllies();commitSoon()};row.append(one,two,rm);list.appendChild(row)})}
 $('#allyAdd').onclick=()=>{const a=+$('#allyA').value,b=+$('#allyB').value;if(!a||!b||a==b)return toast('Choose two different countries');if(isAllied(a,b))return toast('Those countries are already allied');const pair=[a,b].sort((x,y)=>(country(x)?.name||'').localeCompare(country(y)?.name||'',undefined,{sensitivity:'base'}));alliances.push({a:pair[0],b:pair[1]});buildAllies();commitSoon();toast('Alliance added')};
-function refreshGroupSelectionUi(){document.querySelectorAll('#cl .row').forEach(r=>{const id=Number(r.dataset.cid);r.classList.toggle('on',!!S.cur&&id===S.cur.id);r.classList.toggle('multi',multiCountryIds.has(id))});const bar=$('#mergeBar');if(bar){bar.hidden=multiCountryIds.size<2;$('#mergeCount').textContent=multiCountryIds.size+' selected'}}
+function refreshGroupSelectionUi(){document.querySelectorAll('#cl .row').forEach(r=>{const id=Number(r.dataset.cid);r.classList.toggle('on',!!S.cur&&id===S.cur.id);r.classList.toggle('multi',multiCountryIds.has(id))});const bar=$('#mergeBar');if(bar){bar.hidden=multiCountryIds.size<2;$('#mergeCount').textContent=multiCountryIds.size+' selected';const cre=creativeOnly();['#groupAlly','#groupUnally'].forEach(q=>{const b=$(q);if(b)b.hidden=!cre})}}
+function creativeOnly(){return !(window.SV&&window.SV.on)&&!window.MPH&&!window.MPG}
+function groupAlliance(make){if(!creativeOnly())return toast('Group alliances are only available in creative mode');const ids=[...multiCountryIds].filter(id=>country(id));if(ids.length<2)return toast('Ctrl/Cmd-click at least two countries first');let n=0;
+ if(make){for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++){const a=Math.min(ids[i],ids[j]),b=Math.max(ids[i],ids[j]);if(!alliances.some(p=>(p.a==a&&p.b==b)||(p.a==b&&p.b==a))){alliances.push({a,b});n++}}}
+ else{const set=new Set(ids),before=alliances.length;alliances=alliances.filter(p=>!(set.has(p.a)&&set.has(p.b)));n=before-alliances.length}
+ try{buildAllies()}catch(e){}commitSoon();toast(make?(n?n+' alliance'+(n>1?'s':'')+' made between '+ids.length+' countries':'They were all allied already'):(n?n+' alliance'+(n>1?'s':'')+' removed':'No alliances between those countries'))}
 function toggleGroupCountry(c){if(!c)return;if(multiCountryIds.has(c.id))multiCountryIds.delete(c.id);else multiCountryIds.add(c.id);S.cur=c;refreshGroupSelectionUi();toast((multiCountryIds.has(c.id)?'Selected ':'Unselected ')+c.name)}
 function getSelectedArmyUnits(){
   const ids=multiArmyIds.size?[...multiArmyIds]:[(commandArmyId??(S.sel&&S.sel.type==='a'?S.sel.id:null))];
@@ -855,7 +860,7 @@ function buildCl(){const l=$('#cl');l.innerHTML='';
 countries.forEach(c=>{const r=document.createElement('div');r.className='row'+(c==S.cur?' on':'');r.innerHTML='<canvas width="46" height="31" title="Edit flag"></canvas><input type="color"><input class="nm"><button title="Delete country">×</button>';
 const [th,col,nm,x]=[r.children[0],r.children[1],r.children[2],r.children[3]];r.dataset.cid=c.id;drawFlag(th.getContext('2d'),c.flag,23,15.5,46);col.value=c.color;nm.value=c.name;nm.onchange=buildAllies;
 r.onpointerdown=e=>{
-  if(e.shiftKey&&e.target.tagName!=='INPUT'&&e.target.tagName!=='BUTTON'){
+  if((e.shiftKey||e.ctrlKey||e.metaKey)&&e.target.tagName!=='INPUT'&&e.target.tagName!=='BUTTON'){
     e.preventDefault();toggleGroupCountry(c);return;
   }
   multiCountryIds.clear();multiArmyIds.clear();S.cur=c;
@@ -873,7 +878,7 @@ r.onpointerdown=e=>{
 th.onclick=e=>{if(e.metaKey||e.ctrlKey)return;openFE(c)};col.oninput=()=>{c.color=col.value;recolor(c)};nm.oninput=()=>c.name=nm.value;
 x.onclick=()=>{if(items.some(i=>i.type==='a'&&i.id===commandArmyId&&i.cid===c.id))commandArmyId=null;countries=countries.filter(o=>o!=c);items=items.filter(i=>i.cid!=c.id);alliances=alliances.filter(p=>p.a!=c.id&&p.b!=c.id);multiCountryIds.delete(c.id);if(S.cur==c)S.cur=countries[0]||null;select(null);buildCl();buildAllies();terrD=uD=1};l.appendChild(r)});buildAllies();refreshGroupSelectionUi()}
 $('#addc').onclick=()=>{const k=rc(),c=addCountry('Country '+uid,k,{bg:rc(),shapes:[sh('r',60,40,120,26,'#fff'),sh('t',20,40,50,60,k,90)]});S.cur=c;multiCountryIds.clear();buildCl();buildAllies()};
-$('#mergeCountries').onclick=combineSelectedCountries;
+$('#mergeCountries').onclick=combineSelectedCountries;$('#groupAlly').onclick=()=>groupAlliance(true);$('#groupUnally').onclick=()=>groupAlliance(false);
 /* ---------- flag editor ---------- */
 const fcv=$('#fcv'),fx=fcv.getContext('2d');let fc,fs=-1,fd=null,fU=[],fR=[],fTag='',fT=0,fclip=null,fpn=0;
 function openFE(c){fc=c;fs=-1;fU=[];fR=[];fTag='';$('#fbg').value=c.flag.bg;$('#fe').hidden=false;feSync()}
@@ -4900,7 +4905,7 @@ function guestPos(d){
   for(const e of d.fx||[]){const at=M.idx.get(e[0]),df=M.idx.get(e[1]);if(at&&df){try{playAttackEffect(at,df,!!e[2],true,e[3]||0)}catch(err){}}} /* shots, sword clashes, lasers, sounds */
   for(const [id,x,y,mt,n,mul] of d.a){const a=M.idx.get(id);if(!a)continue;if(mul!==undefined)a._mul=mul;
     if(n!==undefined&&a.n!==n){
-      if(a._fight&&now-a._fight<1500){const o=armyStrength(a),nn=armyStrength({n});if(nn<o)float(a.x,a.y-62,'\u2212'+(o-nn).toLocaleString('en-US'))}
+      if(a._fight&&now-a._fight<2500){const o=armyStrength(a),nn=armyStrength({n});if(nn<o)float(a.x,a.y-62,'\u2212'+(o-nn).toLocaleString('en-US'),a,o-nn)}
       a.n=n;if(a.cid==M.cid)M.ob.set(id,ikeyG(a))}
     /* --- position: push a timestamped snapshot, smooth() blends between them --- */
     let sn=a._sn;
@@ -5237,92 +5242,226 @@ window.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCa
 })();
 </script>
 <style id="pewPlanStyle">
-#planWin{position:fixed;right:14px;top:64px;width:250px;z-index:40;background:var(--pn);color:var(--tx);border:1px solid var(--bd);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.3);padding:8px;font-size:12px}
-#planWin[hidden]{display:none}#planWin h4{margin:0 0 6px;cursor:move;user-select:none;touch-action:none;display:flex;gap:6px;align-items:center}
-#planWin .pr{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:4px 0}#planWin button{padding:6px 4px;border-radius:6px;font-size:12px;background:var(--bt);color:var(--tx);border:1px solid var(--bd)}
-#planWin button.on{background:var(--ac);color:var(--ax)}#planWin .go{grid-column:1/3;font-weight:700}#planWin .hint{line-height:1.35;margin:4px 0}
+#planWin{position:fixed;right:14px;top:64px;width:300px;max-height:calc(100vh - 84px);overflow:auto;z-index:40;background:var(--pn);color:var(--tx);border:1px solid var(--bd);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.3);padding:8px;font-size:12px}
+#planWin[hidden]{display:none}
+#planWin h4{margin:0 0 4px;cursor:move;user-select:none;touch-action:none;display:flex;gap:6px;align-items:center}
+#planWin .sec{font-weight:700;margin:9px 0 3px}
+#planWin .pr{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:4px 0}
+#planWin .p5{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin:4px 0}
+#planWin button,#planWin select{padding:6px 4px;border-radius:6px;font-size:12px;background:var(--bt);color:var(--tx);border:1px solid var(--bd);cursor:pointer}
+#planWin button.on{background:var(--ac);color:var(--ax)}
+#planWin .go{grid-column:1/3;font-weight:700}
+#planWin .hint{line-height:1.35;margin:4px 0;opacity:.88}
+#planWin label{display:flex;gap:6px;align-items:center;margin:3px 0}
+#planWin label input[type=range]{flex:1;min-width:0}
+#planWin label b{min-width:34px;text-align:right;font-weight:600}
+#planWin .chip{display:flex;align-items:center;gap:6px;padding:4px 6px;margin:3px 0;border:1px solid var(--bd);border-radius:6px;cursor:pointer}
+#planWin .chip.on{outline:2px solid var(--ac)}
+#planWin .chip i{width:12px;height:12px;border-radius:3px;flex:none}
+#planWin .chip span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#planWin .chip button{padding:2px 7px}
 #planOv{position:fixed;pointer-events:none;z-index:20}
 </style>
 <script id="pewBattlePlan">
 (()=>{
-const $=s=>document.querySelector(s),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+/* BATTLE PLAN v2
+   Step 1  Line up: drag a line at ANY angle (Shift snaps to 15deg), or use the angle presets / slider, spacing slider and shape.
+   Step 2  Arrows: draw ONE arrow per army (freehand drag = curved path, click = straight leg). Each army then follows its own
+           arrow at its own speed. "Whole line" draws a single arrow that moves the entire formation.
+   Armies can be sent one at a time (play button on each army) or all together (Execute plan). */
+const $=s=>document.querySelector(s),clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y),DEG=Math.PI/180;
 const cvEl=$('#c');if(!cvEl)return;
 const MP=()=>window.MPH||window.MPG,myPid=()=>window.SV?window.SV.pid:null;
-const PL={mode:null,paths:[],form:null,run:false,step:0,t0:0,ids:[],last:0,sel:null,drag:null};
+const PL={mode:null,aim:'each',P:{},ids:[],active:null,run:false,st:{},f:{c:null,ang:0,sp:70,shape:'line'},placed:false,center:null,slot:{},drag:null,hist:[],key:'',col:{},colN:0,preview:false};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 /* ---- window + overlay ---- */
 const win=document.createElement('div');win.id='planWin';win.hidden=true;
-win.innerHTML='<h4><span id="plT">Battle plan</span></h4><div class="hint" id="plH"></div><div class="pr"><button data-m="line">1 · Line up</button><button data-m="arrow">2 · Arrows</button><button class="go" id="plGo">Execute plan</button><button id="plClr">Clear</button><button id="plX">Stop</button></div><label class="hint"><input type="checkbox" id="plHold" checked> Hold the line (wait for stragglers)</label>';
+win.innerHTML='<h4><span id="plT">Battle plan</span></h4><div class="hint" id="plH"></div>'
++'<div class="sec">1 · Line up</div>'
++'<div class="p5"><button data-pre="0" title="Horizontal line">&mdash;</button><button data-pre="90" title="Vertical line">|</button><button data-pre="135" title="Diagonal /">/</button><button data-pre="45" title="Diagonal \\">\\</button><button id="plFlip" title="Turn the front of the line round">Flip</button></div>'
++'<div class="pr"><button data-m="line">Drag a line</button><select id="plShape"><option value="line">Straight line</option><option value="wedge">Wedge</option><option value="arc">Arc</option></select></div>'
++'<label>Angle<input type="range" id="plAng" min="0" max="359" value="0"><b id="plAngV">0°</b></label>'
++'<label>Spacing<input type="range" id="plSp" min="36" max="180" value="70"><b id="plSpV">70</b></label>'
++'<div class="sec">2 · Arrows</div>'
++'<div class="pr"><button data-m="arrow">Draw arrows</button><button id="plAim" title="Switch between one arrow per army and one arrow for the whole line">Each army</button></div>'
++'<div id="plList"></div>'
++'<label><input type="checkbox" id="plAuto" checked> Jump to the next army after each arrow</label>'
++'<label><input type="checkbox" id="plHold"> Keep in step (wait at each corner)</label>'
++'<label><input type="checkbox" id="plTurn" checked> Whole-line arrow turns the line with the path</label>'
++'<div class="pr"><button id="plNext">Next army</button><button id="plUndo">Undo arrow</button><button id="plClr">Clear all</button><button id="plX">Stop</button><button class="go" id="plGo">Execute plan</button></div>';
 document.body.append(win);
 const ov=document.createElement('canvas');ov.id='planOv';document.body.append(ov);const ox=ov.getContext('2d');
 let raf=0;
-function wp(p){return{x:(p.x-cam.x)*cam.z,y:(p.y-cam.y)*cam.z}}
-function armies(){return PL.ids.map(id=>items.find(i=>i.type==='a'&&i.id===id)).filter(Boolean)}
+const wp=p=>({x:(p.x-cam.x)*cam.z,y:(p.y-cam.y)*cam.z});
+const armyById=id=>items.find(i=>i.type==='a'&&i.id===id);
+const armies=()=>PL.ids.map(armyById).filter(Boolean);
+const colOf=id=>PL.col[id]||(PL.col[id]='hsl('+((PL.colN++*67)%360)+',85%,58%)');
+const pathOf=id=>PL.P[id]||(PL.P[id]=[]);
+const live=id=>PL.st[id]&&!PL.st[id].done;
 function selected(){let a=[];try{a=getSelectedArmyUnits()}catch(e){a=[...multiArmyIds].map(id=>items.find(i=>i.id===id)).filter(Boolean)}
  if(MP()){const m=myPid();a=a.filter(x=>x.cid===m)}return a}
-function arrow(a,b,col,w){const dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy);if(L<2)return;const ux=dx/L,uy=dy/L;ox.strokeStyle=col;ox.fillStyle=col;ox.lineWidth=w;ox.beginPath();ox.moveTo(a.x,a.y);ox.lineTo(b.x-ux*10,b.y-uy*10);ox.stroke();ox.beginPath();ox.moveTo(b.x,b.y);ox.lineTo(b.x-ux*14-uy*7,b.y-uy*14+ux*7);ox.lineTo(b.x-ux*14+uy*7,b.y-uy*14-ux*7);ox.closePath();ox.fill()}
-function paint(){raf=0;const r=cvEl.getBoundingClientRect();if(ov.style.left!==r.left+'px'||ov.width!==Math.round(r.width)||ov.height!==Math.round(r.height)){ov.style.left=r.left+'px';ov.style.top=r.top+'px';ov.width=Math.round(r.width);ov.height=Math.round(r.height)}
- ox.clearRect(0,0,ov.width,ov.height);const A=armies();
- if(A.length&&(PL.mode||PL.paths.length||PL.run)){
-  A.forEach((a,i)=>{const col='hsl('+(i*67%360)+',85%,58%)',path=PL.paths[i]||[];let prev=wp(a);path.forEach((q,k)=>{const n=wp(q);arrow(prev,n,col,3);ox.fillStyle=col;ox.font='bold 11px sans-serif';ox.fillText(String(k+1),n.x+6,n.y-6);prev=n;if(PL.run&&k==PL.step){ox.strokeStyle='#fff';ox.lineWidth=2;ox.beginPath();ox.arc(n.x,n.y,11,0,7);ox.stroke()}})});
-  if(PL.form){const a=wp(PL.form.a),b=wp(PL.form.b);ox.strokeStyle='#ffd24a';ox.lineWidth=4;ox.setLineDash([8,6]);ox.beginPath();ox.moveTo(a.x,a.y);ox.lineTo(b.x,b.y);ox.stroke();ox.setLineDash([])}
-  if(PL.drag&&PL.drag.k=='arr'){arrow(wp(PL.drag.a),wp(PL.drag.b),'#ffffff',3)}}
- if(PL.drag&&PL.drag.k=='box'){const a=wp(PL.drag.a),b=wp(PL.drag.b);ox.strokeStyle='#4ac0ff';ox.fillStyle='rgba(74,192,255,.15)';ox.lineWidth=1.5;ox.fillRect(a.x,a.y,b.x-a.x,b.y-a.y);ox.strokeRect(a.x,a.y,b.x-a.x,b.y-a.y)}
- if(PL.mode||PL.run||PL.drag||PL.paths.length)kick()}
-function kick(){if(!raf)raf=requestAnimationFrame(paint)}
+const centroid=A=>({x:A.reduce((s,a)=>s+a.x,0)/A.length,y:A.reduce((s,a)=>s+a.y,0)/A.length});
+function speedOf(a,withWar){let s=Math.max(28,Number(a.moveSpeed)||82);if(withWar){try{if(window.warMul)s*=window.warMul(a)||1}catch(e){}}return s}
+function endOf(id){const p=PL.P[id];if(p&&p.length)return p[p.length-1];const a=armyById(id);return a?{x:a.x,y:a.y}:null}
 /* ---- orders (same calls as a normal click-move, so multiplayer host and guest both work) ---- */
 function order(a,t){const m=MP();if(m&&a.cid!==myPid())return;a.attackOrderAt=performance.now();a.moveTarget={x:clamp(t.x,12,W-12),y:clamp(t.y,12,H-12)};a._ct=null;a._chased=0;a.moveConquerPos={x:a.x,y:a.y};a.cp=null;a.combatReady=true;a.faceAngle=Math.atan2(t.y-a.y,t.x-a.x);
  try{if(window.MPH&&window.noteMpManualOrder)window.noteMpManualOrder(a,a.moveTarget);if(window.MPG&&window.MP&&window.MP.sendArmyOrder)window.MP.sendArmyOrder(a,a.moveTarget)}catch(e){}combatPaused=0}
-/* ---- slots on a line ---- */
-function lineUp(a,b){const A=armies(),n=A.length;let dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy);if(L<30){dx=1;dy=0;L=1;b={x:a.x+70*(n-1),y:a.y}}const ux=dx/L,uy=dy/L,len=Math.hypot(b.x-a.x,b.y-a.y),sp=clamp(len/Math.max(1,n-1),44,130),cx=(a.x+b.x)/2,cy=(a.y+b.y)/2;
- const order0=A.map(u=>({u,t:(u.x-cx)*ux+(u.y-cy)*uy})).sort((p,q)=>p.t-q.t);PL.ids=order0.map(o=>o.u.id);PL.offs=order0.map((o,i)=>(i-(n-1)/2)*sp);PL.center={x:cx,y:cy};PL.paths=PL.ids.map(()=>[]);PL.dir={x:-uy,y:ux};
- PL.form={a:{x:cx-ux*(n-1)/2*sp,y:cy-uy*(n-1)/2*sp},b:{x:cx+ux*(n-1)/2*sp,y:cy+uy*(n-1)/2*sp}};
- order0.forEach((o,i)=>order(o.u,{x:cx+ux*PL.offs[i],y:cy+uy*PL.offs[i]}));SFX&&SFX.march&&SFX.march()}
-function addFormationStep(p){const A=armies();if(!PL.center||A.length<2)return toast('Line your armies up first (step 1)');const c=PL.center,dx=p.x-c.x,dy=p.y-c.y,L=Math.hypot(dx,dy);if(L<20)return;const fx=dx/L,fy=dy/L,px=-fy,py=fx;
- A.forEach((a,i)=>PL.paths[i].push({x:p.x+px*PL.offs[i],y:p.y+py*PL.offs[i]}));PL.center={x:p.x,y:p.y};PL.dir={x:fx,y:fy}}
-function nearEnd(p){const A=armies();let best=null,bd=48/cam.z;A.forEach((a,i)=>{const path=PL.paths[i]||[],e=path.length?path[path.length-1]:a,d=Math.hypot(p.x-e.x,p.y-e.y);if(d<bd){bd=d;best=i}});return best}
-/* ---- running the plan ---- */
-function stepTargets(s){return armies().map((a,i)=>{const path=PL.paths[i]||[];return path.length?path[Math.min(s,path.length-1)]:null})}
-function maxSteps(){return Math.max(0,...PL.paths.map(p=>p.length))}
-function issueStep(){const A=armies(),T=stepTargets(PL.step);A.forEach((a,i)=>{if(T[i])order(a,T[i])});PL.t0=performance.now();PL.last=PL.t0}
-function tickPlan(){if(!PL.run)return;if(worldPaused)return;const A=armies();if(!A.length){stop('Plan stopped: no armies left');return}
- const T=stepTargets(PL.step),now=performance.now(),hold=$('#plHold').checked;let arrived=0,need=0;
- A.forEach((a,i)=>{if(!T[i])return;need++;const d=Math.hypot(a.x-T[i].x,a.y-T[i].y);if(d<46)arrived++;else if(!a.moveTarget&&now-PL.last>1800){order(a,T[i])}});
- const ready=hold?arrived>=need:arrived>=Math.ceil(need*.6);
- if(ready||now-PL.t0>30000){PL.step++;if(PL.step>=maxSteps()){stop('Attack plan complete');return}issueStep()}else if(now-PL.last>1800)PL.last=now;
- kick()}
-setInterval(tickPlan,300);
-function stop(msg){PL.run=false;PL.step=0;if(msg)toast(msg);sync()}
+function cancelOrder(a){a.moveTarget=null;a.moveConquerPos=null;try{if(window.MPH&&window.noteMpManualOrder)window.noteMpManualOrder(a,null)}catch(e){}}
+/* ---- formation (any angle, any shape) ---- */
+function slotsFor(c,ang,sp,shape,n){const ux=Math.cos(ang),uy=Math.sin(ang),fx=uy,fy=-ux,h=(n-1)/2,mx=Math.max(1,h*sp);
+ return Array.from({length:n},(_,i)=>{const s=(i-h)*sp;let d=0;if(shape==='wedge')d=-Math.abs(s)*.55;else if(shape==='arc')d=(s*s)/(mx*mx)*mx*.5;return{x:c.x+ux*s+fx*d,y:c.y+uy*s+fy*d,s,d}})}
+function applyFormation(){if(PL.run&&Object.keys(PL.st).some(live))return toast('Wait for the marching armies to arrive first');
+ const A=armies();if(A.length<2)return toast('Select at least 2 armies (Ctrl/Cmd-click flags, or Ctrl/Cmd-drag a box)');
+ const f=PL.f;if(!f.c)f.c=centroid(A);const u={x:Math.cos(f.ang),y:Math.sin(f.ang)},S=slotsFor(f.c,f.ang,f.sp,f.shape,A.length);
+ const sorted=A.map(a=>({a,t:(a.x-f.c.x)*u.x+(a.y-f.c.y)*u.y})).sort((p,q)=>p.t-q.t);
+ PL.ids=sorted.map(o=>o.a.id);PL.slot={};PL.P={};PL.hist=[];PL.st={};PL.run=false;
+ sorted.forEach((o,i)=>{PL.slot[o.a.id]={s:S[i].s,d:S[i].d};order(o.a,{x:S[i].x,y:S[i].y})});
+ PL.center={x:f.c.x,y:f.c.y};PL.placed=true;PL.preview=false;PL.active=PL.ids[0];try{SFX&&SFX.march&&SFX.march()}catch(e){}}
+function formFromDrag(d){const L=dist(d.a,d.b);if(L*cam.z<14)return{c:d.a,ang:PL.f.ang,sp:PL.f.sp};
+ let ang=Math.atan2(d.b.y-d.a.y,d.b.x-d.a.x);if(d.shift)ang=Math.round(ang/(15*DEG))*15*DEG;
+ const n=Math.max(2,armies().length),mid={x:(d.a.x+d.b.x)/2,y:(d.a.y+d.b.y)/2};return{c:mid,ang,sp:clamp(L/(n-1),36,180)}}
+/* ---- path drawing ---- */
+function segDist(p,a,b){const dx=b.x-a.x,dy=b.y-a.y,l2=dx*dx+dy*dy;if(!l2)return dist(p,a);const t=clamp(((p.x-a.x)*dx+(p.y-a.y)*dy)/l2,0,1);return Math.hypot(p.x-(a.x+t*dx),p.y-(a.y+t*dy))}
+function rdp(p,eps){if(p.length<3)return p.slice();let mx=0,ix=0;const a=p[0],b=p[p.length-1];for(let i=1;i<p.length-1;i++){const d=segDist(p[i],a,b);if(d>mx){mx=d;ix=i}}
+ if(mx>eps){const l=rdp(p.slice(0,ix+1),eps),r=rdp(p.slice(ix),eps);return l.slice(0,-1).concat(r)}return[a,b]}
+function simplify(pts){let eps=7/cam.z,r=rdp(pts,eps);while(r.length>60){eps*=1.4;r=rdp(pts,eps)}
+ const gap=14/cam.z,out=[r[0]];for(let i=1;i<r.length;i++){if(i===r.length-1||dist(r[i],out[out.length-1])>=gap)out.push(r[i])}return out}
+function nearEnd(p){let best=null,bd=44/cam.z;armies().forEach(a=>{if(live(a.id))return;const e=endOf(a.id),d=dist(p,e);if(d<bd){bd=d;best=a.id}});return best}
+function nextEmpty(from){const ids=PL.ids,n=ids.length;if(!n)return null;const s=Math.max(0,ids.indexOf(from));for(let k=1;k<=n;k++){const id=ids[(s+k)%n];if(!live(id)&&!(PL.P[id]&&PL.P[id].length))return id}return null}
+function clampPt(p){return{x:clamp(p.x,12,W-12),y:clamp(p.y,12,H-12)}}
+function strokeEach(pts,moved){let id=PL.active;if(PL.drag&&PL.drag.own!=null)id=PL.drag.own;if(id==null||!armyById(id))return toast('Pick an army in the list first');
+ if(live(id))return toast('That army is already marching');
+ const start=endOf(id);let add;if(!moved)add=[clampPt(pts[0])];else{add=simplify(pts).map(clampPt);if(add.length&&dist(add[0],start)<30/cam.z)add.shift()}
+ if(!add.length)return;pathOf(id).push(...add);PL.hist.push({id,n:add.length});PL.active=id;
+ if(moved&&$('#plAuto').checked){const nx=nextEmpty(id);if(nx!=null)PL.active=nx}}
+function strokeWhole(pts,moved){if(!PL.placed||!PL.center)return toast('Line your armies up first (step 1)');
+ const A=armies().filter(a=>!live(a.id)&&PL.slot[a.id]);if(!A.length)return toast('No armies are free to move');
+ let S=moved?simplify(pts):[pts[0]];if(moved&&S.length&&dist(S[0],PL.center)<30/cam.z)S.shift();
+ const turn=$('#plTurn').checked,c0={x:PL.center.x,y:PL.center.y},a0=PL.f.ang;let prev=PL.center,ang=PL.f.ang;const added={};
+ S.forEach(q=>{q=clampPt(q);const dx=q.x-prev.x,dy=q.y-prev.y;if(Math.hypot(dx,dy)<6)return;if(turn)ang=Math.atan2(dy,dx)+Math.PI/2;
+  const ux=Math.cos(ang),uy=Math.sin(ang),fx=uy,fy=-ux;
+  A.forEach(a=>{const sl=PL.slot[a.id];pathOf(a.id).push(clampPt({x:q.x+ux*sl.s+fx*sl.d,y:q.y+uy*sl.s+fy*sl.d}));added[a.id]=(added[a.id]||0)+1});prev=q});
+ if(!Object.keys(added).length)return;PL.center={x:prev.x,y:prev.y};PL.f.ang=ang;PL.hist.push({whole:true,added,c0,a0})}
+function undo(){const h=PL.hist.pop();if(!h)return toast('Nothing to undo');
+ if(h.whole){for(const id in h.added)if(PL.P[id])PL.P[id].length=Math.max(0,PL.P[id].length-h.added[id]);PL.center=h.c0;PL.f.ang=h.a0}
+ else{const p=PL.P[h.id];if(p)p.length=Math.max(0,p.length-h.n);PL.active=h.id}}
+/* ---- running the plan: every army follows its own arrow at its own speed ---- */
+function launch(id){const a=armyById(id),p=PL.P[id]||[];if(!a||!p.length||live(id))return false;PL.st[id]={k:0,last:performance.now(),w:false,done:false};order(a,p[0]);PL.run=true;return true}
+function canAdvance(id,k){for(const j in PL.st){if(+j===id)continue;const s=PL.st[j];if(s.done)continue;if(!(s.k>k||(s.k===k&&s.w)))return false}return true}
+function finish(msg){const ids=Object.keys(PL.st);ids.forEach(id=>{if(PL.st[id].done)PL.P[id]=[]});PL.st={};PL.run=false;PL.hist=[];if(msg)toast(msg);sync()}
+function tick(){if(!PL.run||worldPaused)return;const now=performance.now(),hold=$('#plHold').checked;let any=false;
+ for(const key in PL.st){const id=+key,s=PL.st[key];if(s.done)continue;const a=armyById(id),p=PL.P[id]||[];if(!a||!p.length){s.done=true;continue}any=true;
+  const last=s.k>=p.length-1,T=p[s.k],d=dist(a,T);
+  if(!last){const thr=hold?18:clamp(speedOf(a,true)*.2,14,40);
+   if(d<thr){if(hold){s.w=true;if(canAdvance(id,s.k)){s.w=false;s.k++;order(a,p[s.k]);s.last=now}}else{s.k++;order(a,p[s.k]);s.last=now}}
+   else if(!a.moveTarget&&now-s.last>1200){order(a,T);s.last=now}}
+  else{if(d<10||(!a.moveTarget&&d<40&&now-s.last>900))s.done=true;else if(!a.moveTarget&&now-s.last>1200){order(a,T);s.last=now}}}
+ if(!any||Object.values(PL.st).every(s=>s.done))finish('Attack plan complete');else kick()}
+setInterval(tick,80);
+function stopAll(msg){armies().forEach(a=>{if(PL.st[a.id])cancelOrder(a)});PL.st={};PL.run=false;if(msg)toast(msg);sync()}
+/* ---- painting ---- */
+function poly(P,col,dash,dots){if(P.length<2)return;ox.lineJoin='round';ox.lineCap='round';ox.beginPath();P.forEach((q,i)=>i?ox.lineTo(q.x,q.y):ox.moveTo(q.x,q.y));
+ ox.setLineDash([]);ox.strokeStyle='rgba(0,0,0,.45)';ox.lineWidth=7;ox.stroke();ox.strokeStyle=col;ox.lineWidth=4;if(dash){ox.setLineDash([12,8]);ox.lineDashOffset=-(performance.now()/45)%20}ox.stroke();ox.setLineDash([]);
+ if(dots)for(let i=1;i<P.length-1;i++){ox.fillStyle=col;ox.beginPath();ox.arc(P[i].x,P[i].y,3,0,7);ox.fill()}
+ const e=P[P.length-1];let k=P.length-2,b=P[k];while(k>0&&Math.hypot(e.x-b.x,e.y-b.y)<12){k--;b=P[k]}
+ const dx=e.x-b.x,dy=e.y-b.y,L=Math.hypot(dx,dy)||1,ux=dx/L,uy=dy/L;ox.beginPath();ox.moveTo(e.x+ux*4,e.y+uy*4);ox.lineTo(e.x-ux*14-uy*8,e.y-uy*14+ux*8);ox.lineTo(e.x-ux*14+uy*8,e.y-uy*14-ux*8);ox.closePath();ox.fillStyle=col;ox.strokeStyle='rgba(0,0,0,.55)';ox.lineWidth=2;ox.stroke();ox.fill()}
+function drawFormation(c,ang,sp,shape,n,alpha){const S=slotsFor(c,ang,sp,shape,n).map(wp);ox.save();ox.globalAlpha=alpha;ox.strokeStyle='#ffd24a';ox.lineWidth=3;ox.setLineDash([8,6]);ox.beginPath();S.forEach((q,i)=>i?ox.lineTo(q.x,q.y):ox.moveTo(q.x,q.y));ox.stroke();ox.setLineDash([]);
+ S.forEach(q=>{ox.fillStyle='#ffd24a';ox.beginPath();ox.arc(q.x,q.y,5,0,7);ox.fill();ox.strokeStyle='rgba(0,0,0,.6)';ox.lineWidth=1.5;ox.stroke()});
+ const cc=wp(c),fx=Math.sin(ang),fy=-Math.cos(ang);ox.strokeStyle='#ffd24a';ox.lineWidth=3;ox.beginPath();ox.moveTo(cc.x,cc.y);ox.lineTo(cc.x+fx*34,cc.y+fy*34);ox.stroke();
+ ox.fillStyle='#ffd24a';ox.beginPath();ox.moveTo(cc.x+fx*44,cc.y+fy*44);ox.lineTo(cc.x+fx*30-fy*7,cc.y+fy*30+fx*7);ox.lineTo(cc.x+fx*30+fy*7,cc.y+fy*30-fx*7);ox.closePath();ox.fill();ox.restore()}
+function paint(){raf=0;const r=cvEl.getBoundingClientRect(),d=Math.min(2,window.devicePixelRatio||1),w=Math.round(r.width),h=Math.round(r.height);
+ if(ov.style.left!==r.left+'px'||ov.style.top!==r.top+'px'||ov.width!==w*d||ov.height!==h*d){ov.style.left=r.left+'px';ov.style.top=r.top+'px';ov.style.width=w+'px';ov.style.height=h+'px';ov.width=w*d;ov.height=h*d}
+ ox.setTransform(d,0,0,d,0,0);ox.clearRect(0,0,w,h);
+ if(win.hidden&&!PL.run)return;
+ const A=armies(),n=Math.max(2,A.length);
+ A.forEach(a=>{const s=PL.st[a.id];if(s&&s.done)return;const p=PL.P[a.id]||[];if(!p.length)return;const col=colOf(a.id),pts=[wp(a)].concat(p.slice(s?s.k:0).map(wp));poly(pts,col,!!s,true)});
+ A.forEach(a=>{const q=wp(a),on=a.id===PL.active&&PL.mode==='arrow'&&PL.aim==='each';ox.strokeStyle=on?'#fff':colOf(a.id);ox.lineWidth=on?3:2;ox.beginPath();ox.arc(q.x,q.y,on?20+Math.sin(performance.now()/180)*2:15,0,7);ox.stroke()});
+ if(PL.mode==='arrow'&&PL.aim==='whole'&&PL.placed&&PL.center&&!PL.run)drawFormation(PL.center,PL.f.ang,PL.f.sp,PL.f.shape,n,.55);
+ const dr=PL.drag;
+ if(dr&&dr.k==='line'){const f=formFromDrag(dr);drawFormation(f.c,f.ang,f.sp,PL.f.shape,n,.95)}
+ else if(PL.preview&&PL.mode!=='arrow')drawFormation(PL.f.c||centroid(A.length?A:[{x:0,y:0}]),PL.f.ang,PL.f.sp,PL.f.shape,n,.8);
+ if(dr&&dr.k==='arr'){let st=null;if(PL.aim==='whole')st=PL.center;else{const id=dr.own!=null?dr.own:PL.active;st=id!=null?endOf(id):null}
+  const pts=(st&&dist(st,dr.pts[0])>2/cam.z?[st]:[]).concat(dr.pts).map(wp);if(pts.length>1)poly(pts,'#ffffff',false,false)}
+ if(dr&&dr.k==='box'){const a=wp(dr.a),b=wp(dr.b);ox.strokeStyle='#4ac0ff';ox.fillStyle='rgba(74,192,255,.15)';ox.lineWidth=1.5;ox.fillRect(a.x,a.y,b.x-a.x,b.y-a.y);ox.strokeRect(a.x,a.y,b.x-a.x,b.y-a.y)}
+ if(PL.run||dr)kick()}
+function kick(){if(!raf)raf=requestAnimationFrame(paint)}
+let sig='';function sigCheck(){if(win.hidden&&!PL.run)return;const A=armies();const s=cam.x+','+cam.y+','+cam.z+'|'+A.map(a=>Math.round(a.x)+','+Math.round(a.y)+':'+((PL.P[a.id]||[]).length)).join(';')+'|'+PL.active+PL.mode;if(s!==sig){sig=s;kick()}}
+/* ---- army list ---- */
+let listSig='';
+function renderList(){const A=armies(),s=[PL.active,PL.mode,PL.aim,A.map(a=>a.id+':'+((PL.P[a.id]||[]).length)+':'+(PL.st[a.id]?(PL.st[a.id].done?'d':'r'):'')).join('|')].join('#');if(s===listSig)return;listSig=s;
+ $('#plList').innerHTML=A.map((a,i)=>{const p=PL.P[a.id]||[],st=PL.st[a.id];let len=0,prev={x:a.x,y:a.y};p.forEach(q=>{len+=dist(prev,q);prev=q});
+  const label=st&&!st.done?'marching':p.length?'ready · ~'+Math.max(1,Math.round(len/speedOf(a)))+'s':'no arrow yet';
+  return'<div class="chip'+(a.id===PL.active&&PL.aim==='each'?' on':'')+'" data-id="'+a.id+'"><i style="background:'+colOf(a.id)+'"></i><span>'+(i+1)+'. '+esc(a.n)+' troops · '+label+'</span><button data-act="go" title="Send only this army now">▶</button><button data-act="clr" title="Clear this army\'s arrow">✕</button></div>'}).join('')}
 /* ---- UI state ---- */
-function sync(){const n=selected().length,show=PL.run||PL.mode||n>=2;win.hidden=!show;if(!show){return}
- if(!PL.run&&!PL.mode&&n>=2&&(!PL.ids.length||PL.ids.join()!==selected().map(a=>a.id).join())&&!PL.form){/* fresh selection */PL.ids=selected().map(a=>a.id);PL.paths=PL.ids.map(()=>[]);PL.center=null;PL.form=null}
+function setNum(id,v,t){const e=$(id);if(e&&document.activeElement!==e)e.value=v;$(id+'V').textContent=t}
+function sync(){const sel=selected(),n=sel.length,show=PL.run||PL.mode||n>=2;win.hidden=!show;
+ if(!show){kick();return}
+ if(!PL.run){const key=sel.map(a=>a.id).sort((x,y)=>x-y).join();
+  if(n>=2&&key!==PL.key){PL.key=key;const keep=PL.ids.filter(id=>sel.some(a=>a.id===id)),add=sel.map(a=>a.id).filter(id=>!keep.includes(id));PL.ids=keep.concat(add);
+   for(const id in PL.P)if(!PL.ids.includes(+id))delete PL.P[id];PL.hist=[];PL.placed=false;PL.center=null;PL.slot={};PL.f.c=null;PL.preview=false}}
+ if(PL.active==null||!PL.ids.includes(PL.active))PL.active=PL.ids[0]!=null?PL.ids[0]:null;
+ const free=armies().filter(a=>!live(a.id)).length,total=Object.keys(PL.st).length,done=Object.values(PL.st).filter(s=>s.done).length;
  $('#plT').textContent='Battle plan — '+armies().length+' armies';
- win.querySelectorAll('[data-m]').forEach(b=>b.classList.toggle('on',PL.mode==b.dataset.m));
- $('#plGo').textContent=PL.run?'Running… (step '+(PL.step+1)+'/'+maxSteps()+')':'Execute plan';
- $('#plH').textContent=PL.run?'Armies follow their arrows and attack on contact. Press Stop to cancel.':PL.mode=='line'?'Drag on the map to draw the battle line. Armies take their places along it.':PL.mode=='arrow'?'Click or drag to place arrows. Start on an army to give it its own path; anywhere else moves the whole line.':'Ctrl/Cmd+click armies or Ctrl/Cmd+drag a box to select 3+, then Line up and place arrows.'}
-setInterval(()=>{const n=selected().length;if(PL.run||PL.mode||n>=2||!win.hidden)sync()},350);
-win.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
- if(b.dataset.m){PL.ids=PL.ids.length?PL.ids:selected().map(a=>a.id);if(!PL.paths.length)PL.paths=PL.ids.map(()=>[]);if(b.dataset.m=='arrow'&&!PL.center){const A=armies();if(A.length){PL.center={x:A.reduce((s,a)=>s+a.x,0)/A.length,y:A.reduce((s,a)=>s+a.y,0)/A.length};PL.offs=A.map((a,i)=>(i-(A.length-1)/2)*70)}}PL.mode=PL.mode==b.dataset.m?null:b.dataset.m;kick()}
- else if(b.id=='plGo'){if(PL.run)return;if(!maxSteps())return toast('Place at least one arrow first (step 2)');PL.mode=null;PL.run=true;PL.step=0;issueStep();toast('Attack plan started')}
- else if(b.id=='plClr'){PL.paths=PL.ids.map(()=>[]);PL.form=null;PL.center=null;PL.run=false;PL.mode=null;toast('Plan cleared')}
- else if(b.id=='plX'){PL.run=false;PL.mode=null;armies().forEach(a=>{a.moveTarget=null});toast('Plan stopped');}
- sync();kick()});
+ win.querySelectorAll('[data-m]').forEach(b=>b.classList.toggle('on',PL.mode===b.dataset.m));
+ $('#plAim').textContent=PL.aim==='each'?'Each army':'Whole line';$('#plAim').classList.toggle('on',PL.aim==='whole');
+ $('#plShape').value=PL.f.shape;setNum('#plAng',Math.round(((PL.f.ang/DEG)%360+360)%360),Math.round(((PL.f.ang/DEG)%360+360)%360)+'°');setNum('#plSp',Math.round(PL.f.sp),String(Math.round(PL.f.sp)));
+ $('#plGo').textContent=PL.run?'Running… '+done+'/'+total+' arrived':'Execute plan';
+ $('#plH').textContent=PL.mode==='line'?'Drag on the map to draw the battle line at any angle (hold Shift to snap to 15°). A single click drops the line there at the angle set below.'
+  :PL.mode==='arrow'?(PL.aim==='each'?'Pick an army in the list (or press on its flag/arrow end), then drag to draw its path. Drag = curved path, click = straight leg. Each army walks its own arrow at its own speed. ▶ sends one army right away.':'One arrow moves the whole line: drag to draw its path.')
+  :PL.run?'Armies follow their arrows and fight on contact. Stop cancels.'
+  :'Ctrl/Cmd+click flags or Ctrl/Cmd+drag a box to select armies. Then line them up (step 1) and draw arrows (step 2).';
+ renderList();kick()}
+setInterval(()=>{sync();sigCheck()},250);
+/* window drag */
+(()=>{const h=win.querySelector('h4');let d=null;h.addEventListener('pointerdown',e=>{const r=win.getBoundingClientRect();d={dx:e.clientX-r.left,dy:e.clientY-r.top};try{h.setPointerCapture(e.pointerId)}catch(_){}});
+ h.addEventListener('pointermove',e=>{if(!d)return;win.style.left=clamp(e.clientX-d.dx,0,innerWidth-80)+'px';win.style.top=clamp(e.clientY-d.dy,0,innerHeight-40)+'px';win.style.right='auto'});
+ h.addEventListener('pointerup',()=>{d=null})})();
+/* controls */
+win.addEventListener('click',e=>{const bt=e.target.closest('button'),chip=e.target.closest('.chip');
+ if(chip&&(!bt||bt.dataset.act)){const id=+chip.dataset.id;
+  if(bt&&bt.dataset.act==='go'){if(!launch(id))toast(live(id)?'That army is already marching':'Draw an arrow for that army first');PL.mode=PL.mode}
+  else if(bt&&bt.dataset.act==='clr'){if(!live(id)){PL.P[id]=[];PL.hist=PL.hist.filter(h=>h.whole||h.id!==id)}}
+  else{PL.active=id;PL.aim='each';PL.mode='arrow'}
+  listSig='';sync();return}
+ if(!bt)return;
+ if(bt.dataset.m){PL.mode=PL.mode===bt.dataset.m?null:bt.dataset.m;PL.preview=PL.mode==='line'}
+ else if(bt.dataset.pre!==undefined){PL.f.ang=(+bt.dataset.pre)*DEG;if(PL.placed&&PL.center)PL.f.c=PL.center;applyOrPreview()}
+ else if(bt.id==='plFlip'){PL.f.ang+=Math.PI;if(PL.placed&&PL.center)PL.f.c=PL.center;applyOrPreview()}
+ else if(bt.id==='plAim'){PL.aim=PL.aim==='each'?'whole':'each';if(PL.aim==='whole'&&!PL.placed)toast('Line the armies up first, then draw one arrow for the whole line');PL.mode='arrow'}
+ else if(bt.id==='plNext'){const nx=nextEmpty(PL.active);if(nx!=null){PL.active=nx;PL.aim='each';PL.mode='arrow'}else toast('Every free army already has an arrow')}
+ else if(bt.id==='plUndo')undo();
+ else if(bt.id==='plGo'){if(PL.run&&Object.values(PL.st).some(s=>!s.done))return;let n=0;armies().forEach(a=>{if(launch(a.id))n++});if(!n)return toast('Draw at least one arrow first (step 2)');PL.mode=null;toast('Attack plan started — '+n+' armies marching')}
+ else if(bt.id==='plClr'){if(PL.run)stopAll();PL.P={};PL.hist=[];PL.preview=false;PL.mode=null;toast('Plan cleared')}
+ else if(bt.id==='plX'){stopAll('Plan stopped');PL.mode=null}
+ listSig='';sync();kick()});
+function applyOrPreview(){if(PL.placed&&PL.center){applyFormation()}else{PL.preview=true}}
+win.addEventListener('input',e=>{const t=e.target;if(t.id==='plAng'){PL.f.ang=(+t.value)*DEG;PL.preview=true}else if(t.id==='plSp'){PL.f.sp=+t.value;PL.preview=true}
+ if(PL.placed&&PL.center)PL.f.c=PL.center;sync();kick()});
+win.addEventListener('change',e=>{const t=e.target;if(t.id==='plShape'){PL.f.shape=t.value;PL.preview=true}if(t.id==='plAng'||t.id==='plSp'||t.id==='plShape'){if(PL.placed&&PL.center)PL.f.c=PL.center;applyOrPreview()}sync();kick()});
 /* ---- map input (capture phase so the normal select/pan handlers do not also fire) ---- */
 const ptw=e=>{const r=cvEl.getBoundingClientRect();return{x:(e.clientX-r.left)/cam.z+cam.x,y:(e.clientY-r.top)/cam.z+cam.y}};
 window.addEventListener('pointerdown',e=>{if(e.target!==cvEl||e.button!==0)return;const p=ptw(e),cm=e.ctrlKey||e.metaKey;
  if(cm){let hit=null;try{hit=pick(p)}catch(_){}if(hit&&hit.type==='a')return;PL.drag={k:'box',a:p,b:p,id:e.pointerId};e.stopImmediatePropagation();e.preventDefault();try{cvEl.setPointerCapture(e.pointerId)}catch(_){}kick();return}
- if(!PL.mode||PL.run)return;
- if(PL.mode=='line'){PL.drag={k:'line',a:p,b:p};PL.form={a:p,b:p}}
- else{const i=nearEnd(p);PL.drag={k:'arr',a:p,b:p,own:i}}
+ if(!PL.mode||win.hidden||!armies().length)return;
+ if(PL.mode==='line'){if(PL.run&&Object.values(PL.st).some(s=>!s.done))return;PL.drag={k:'line',a:p,b:p,shift:e.shiftKey}}
+ else{const own=PL.aim==='each'?nearEnd(p):null;PL.drag={k:'arr',pts:[p],own,last:p}}
  e.stopImmediatePropagation();e.preventDefault();try{cvEl.setPointerCapture(e.pointerId)}catch(_){}kick()},true);
-window.addEventListener('pointermove',e=>{const d=PL.drag;if(!d)return;d.b=ptw(e);if(d.k=='line')PL.form={a:d.a,b:d.b};kick();e.stopImmediatePropagation()},true);
-window.addEventListener('pointerup',e=>{const d=PL.drag;if(!d)return;PL.drag=null;const p=ptw(e),moved=Math.hypot(p.x-d.a.x,p.y-d.a.y)*cam.z>6;
- if(d.k=='box'){if(!moved){toast('Ctrl/Cmd-click directly on an army flag, or drag a box around several');kick();return}
-  const x1=Math.min(d.a.x,p.x),x2=Math.max(d.a.x,p.x),y1=Math.min(d.a.y,p.y),y2=Math.max(d.a.y,p.y),m=MP()?myPid():null;let last=null,n=0;
-  items.forEach(a=>{if(a.type==='a'&&a.x>=x1&&a.x<=x2&&a.y>=y1&&a.y<=y2&&(m==null||a.cid===m)){multiArmyIds.add(a.id);last=a;n++}});
-  if(last){commandArmyId=last.id;S.sel=last;try{buildSel();refreshGroupSelectionUi()}catch(_){}PL.ids=selected().map(a=>a.id);PL.paths=PL.ids.map(()=>[]);PL.center=null;PL.form=null;toast(multiArmyIds.size+' armies selected')}else toast('No armies in that box');sync();kick();e.stopImmediatePropagation();return}
- if(d.k=='line'){if(armies().length<2){PL.form=null;return}lineUp(d.a,moved?p:d.a);PL.mode='arrow';sync();kick();e.stopImmediatePropagation();return}
- if(d.k=='arr'){const A=armies();if(d.own!=null&&d.own>=0){PL.paths[d.own].push(moved?p:d.a)}else addFormationStep(moved?p:d.a);sync();kick();e.stopImmediatePropagation()}},true);
-window.addEventListener('keydown',e=>{if(e.key==='Escape'&&(PL.mode||PL.run)){PL.mode=null;if(PL.run)PL.run=false;sync();kick()}},true);
+window.addEventListener('pointermove',e=>{const d=PL.drag;if(!d)return;const p=ptw(e);
+ if(d.k==='arr'){if(dist(p,d.last)>=6/cam.z){d.pts.push(p);d.last=p}}else{d.b=p;d.shift=e.shiftKey}
+ kick();e.stopImmediatePropagation()},true);
+window.addEventListener('pointercancel',()=>{if(PL.drag){PL.drag=null;kick()}},true);
+window.addEventListener('pointerup',e=>{const d=PL.drag;if(!d)return;PL.drag=null;const p=ptw(e);
+ if(d.k==='box'){const moved=dist(p,d.a)*cam.z>6;if(!moved){let c=null;try{if(creativeOnly())c=countryAt(p)}catch(_){}if(c){toggleGroupCountry(c);kick();e.stopImmediatePropagation();return}toast('Ctrl/Cmd-click directly on an army flag, or drag a box around several');kick();return}
+  const x1=Math.min(d.a.x,p.x),x2=Math.max(d.a.x,p.x),y1=Math.min(d.a.y,p.y),y2=Math.max(d.a.y,p.y),m=MP()?myPid():null;let last=null;
+  items.forEach(a=>{if(a.type==='a'&&a.x>=x1&&a.x<=x2&&a.y>=y1&&a.y<=y2&&(m==null||a.cid===m)){multiArmyIds.add(a.id);last=a}});
+  if(last){commandArmyId=last.id;S.sel=last;try{buildSel();refreshGroupSelectionUi()}catch(_){}toast(multiArmyIds.size+' armies selected')}else toast('No armies in that box');
+  sync();kick();e.stopImmediatePropagation();return}
+ if(d.k==='line'){const f=formFromDrag({a:d.a,b:p,shift:d.shift});PL.f.c=f.c;PL.f.ang=f.ang;PL.f.sp=f.sp;applyFormation();if(PL.placed){PL.mode='arrow';PL.aim='each'}sync();kick();e.stopImmediatePropagation();return}
+ if(d.k==='arr'){d.pts.push(p);let len=0;for(let i=1;i<d.pts.length;i++)len+=dist(d.pts[i],d.pts[i-1]);const moved=len*cam.z>10;const pts=moved?d.pts:[d.pts[0]];
+  if(PL.aim==='whole')strokeWhole(pts,moved);else strokeEach(pts,moved);listSig='';sync();kick();e.stopImmediatePropagation()}},true);
+window.addEventListener('keydown',e=>{const tg=e.target&&e.target.tagName;if(tg==='INPUT'||tg==='TEXTAREA'||tg==='SELECT')return;
+ if(e.key==='Escape'&&(PL.mode||PL.run)){PL.mode=null;PL.drag=null;if(PL.run&&!e.shiftKey){/* Esc closes the tool only; Stop button cancels marching */}sync();kick()}
+ else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'&&PL.mode==='arrow'&&!win.hidden){e.preventDefault();e.stopPropagation();undo();listSig='';sync();kick()}},true);
 })();
 </script>
 <script id="pewPerfNeutral">
